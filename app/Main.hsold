@@ -1,0 +1,97 @@
+module Main (main) where
+
+import Lib
+import Control.Applicative (pure)
+import GHC.IO.Handle (hFlush)
+import System.IO (stdout)
+import Data.List (intercalate)
+import Data.List.Extra ((!?))
+import Text.Read (readMaybe)
+import qualified Data.Map.Strict as Map
+
+initialQueue :: [Character]
+initialQueue = Henry : Carol : initialQueue
+initialInventories = Map.fromList [(Carol, [Totem]), (Henry, [Hoe, Necklace])]
+
+main :: IO ()
+main = loop (GameState Overview Carol initialQueue [Apple, Hoe] initialInventories)
+
+loop :: GameState -> IO ()
+loop gameState = do
+    putStrLn $ visualize gameState
+    input <- promptInput
+    case input of
+        "q" -> pure ()
+        _ -> case updateGame gameState input of 
+            (output, newGameState) -> putStrLn output >> loop newGameState
+
+
+data Status = Overview | Valuing | Trading
+data GameState = GameState {status :: Status, character :: Character, queue :: [Character], inventory :: [Item}, chInventories :: Map Character [Item], currentDeal :: Deal}
+
+instance Visualize GameState where
+    visualize gameState =
+        case (status gameState) of
+            Overview -> "You are looking at " ++ (visualize $ character gameState) ++ ".\n"
+                     ++ "You have: " ++ intercalate ", " (visualize <$> inventory gameState) ++ "."
+            Valuing -> "You ask " ++ visualize (character gameState) ++ " about the value of \n" ++ numbered (inventory gameState)
+            Trading -> let deal = currentDeal gameState in "You are trading with " ++ (visualize $ character gameState) ++ ".\n"
+                     ++ "You have: " ++ intercalate ", " (visualize <$> inventory gameState) ++ ".\n"
+                     ++ "You offer: " intercalate ", " (visualize <$> yourOffer deal) ++ "\n"
+                     ++ "Their offer: " intercalate ", " (visualize <$> yourOffer deal) ++ "\n"
+
+updateGame :: GameState -> String -> (String, GameState)
+
+updateGame gameState(GameState Overview _ (nextCh : restCh) _ _ _) "n" = ("", gameState{character = nextCh, queue = restCh})
+updateGame gameState@(GameState Overview _ _ _ _ _) "v" = ("\n", gameState{status = Valuing})
+updateGame gameState@(GameState Overview _ _ _ _ _) "t" = ("\n", gameState{status = Trading})
+updateGame gameState@(GameState Overview _ _ _ _ _) _ = ("", gameState)
+
+updateGame gameState@(GameState Valuing ch _ inv) input = case ((readMaybe input) :: Maybe Int) >>= \n -> pure (n - 1) >>= (inv !?) of
+                Just item -> (visualize ch ++ ": The value of " ++ visualize item ++ " is " ++ (show $ value ch item) ++ ".\n", gameState{status = Overview})
+                Nothing -> ("", gameState)
+
+promptInput :: IO String
+promptInput = do 
+        putStr "> "
+        hFlush stdout
+        getLine
+
+
+numbered :: (Visualize a) => [a] -> String
+numbered xs = intercalate "\n" $ zipWith (\x y -> (show x) ++ ". " ++ y) [1..] (visualize <$> xs)
+
+class Visualize a where
+    visualize :: a -> String
+
+data Character = Carol
+               | Henry deriving (Eq, Ord)
+
+instance Visualize Character where
+    visualize Carol = "Carol the Gardener"
+    visualize Henry = "Henry the Museumkeeper"
+
+data Item = Apple
+          | Hoe
+          | Totem
+          | Necklace
+data Deal = Deal {yourOffer :: [Item], theirOffer :: [Item]}
+
+instance Visualize Item where
+    visualize Apple     = "an apple"
+    visualize Hoe       = "a sturdy hoe"
+    visualize Totem     = "an ancient copper totem"
+    visualize Necklace  = "a shiny necklace with a gem" 
+
+
+value :: Character -> Item -> Integer
+
+value Carol Apple    = 0
+value Carol Hoe      = 100
+value Carol Totem    = 20
+value Carol Necklace = 100
+
+value Henry Apple    = 10
+value Henry Hoe      = 10
+value Henry Totem    = 100
+value Henry Necklace = 100
