@@ -14,13 +14,17 @@ import                         Texture
 main :: IO ()
 main =
   runContextT GLFW.defaultHandleConfig $ do
-    win <- newWindow (WindowFormatColor RGB8) (GLFW.WindowConfig displayWidth displayHeight "The Negotiation Game" Nothing [GLFW.WindowHint'Resizable False] Nothing)
-
-    vertexBuffer :: Buffer os (B4 Float, B3 Float) <- newBuffer 4
-    writeBuffer vertexBuffer 0 [ (V4 0 0 0 1, V3 0 1 0)
-                               , (V4 10 0 0 1, V3 1 0 0)
-                               , (V4 0 10 0 1, V3 1 0 0)
-                               , (V4 10 10 0 1, V3 1 0 0)
+    win <- newWindow (WindowFormatColor RGB16) 
+        (GLFW.WindowConfig displayWidth displayHeight "The Negotiation Game" Nothing [GLFW.WindowHint'Resizable False] Nothing)
+    
+    mapTexture <- importTexture mapPath mapHeight mapWidth
+    
+    vertexBuffer :: Buffer os (B4 Float, B2 Float) <- newBuffer 4
+    let mapQuadSize = (negate 10) :: Float
+    writeBuffer vertexBuffer 0 [ (V4 0           0           0 1, V2 0 0)
+                               , (V4 mapQuadSize 0           0 1, V2 1 0)
+                               , (V4 0           mapQuadSize 0 1, V2 0 1)
+                               , (V4 mapQuadSize mapQuadSize 0 1, V2 1 1)
                                ]
                                
     positionBuffer :: Buffer os (Uniform (B3 Float)) <- newBuffer 1 -- Looking-at 2D-position + Zoom level
@@ -34,9 +38,19 @@ main =
     shader <- compileShader $ do
       primitiveStream <- toPrimitiveStream id
       (V3 x y s) <- getUniform $ const (positionBuffer, 0)
-      let primitiveStream2 = fmap (\(point, color) -> (viewBoard (V3 x y 0) s point, color) ) primitiveStream
+      
+      --let pointAt (V4 x y _ _) = V2 (x * convFactorX) (y * convFactorY)
+      let primitiveStream2 = fmap (\(point, texPos) -> (viewBoard (V3 x y 0) s point, texPos)) primitiveStream
       fragmentStream <- rasterize (const (FrontAndBack, PolygonFill, ViewPort (V2 0 0) (V2 displayWidth displayHeight), DepthRange 0 1)) primitiveStream2
-      drawWindowColor (const (win, ContextColorOption NoBlending (V3 True True True))) fragmentStream
+      
+      let filter = SamplerFilter Nearest Nearest Nearest Nothing
+          edge = (pure Repeat, undefined)
+      sampler <- newSampler2D $ const (mapTexture, filter, edge)
+      
+      let sampleTexture = sample2D sampler SampleAuto Nothing Nothing
+          fragmentStreamTextured = fmap sampleTexture fragmentStream
+      
+      drawWindowColor (const (win, ContextColorOption NoBlending (V3 True True True))) fragmentStreamTextured
 
     loop vertexBuffer positionBuffer shader win (V3 0 0 0.5) scrolledTVar debugTVar
 

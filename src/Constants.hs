@@ -20,3 +20,18 @@ mouseScrollSensitivity = 1.0
 
 keyScrollSensitivity :: Double
 keyScrollSensitivity = 0.3
+
+mapPath :: FilePath
+mapPath = "data\\map.png"
+
+mapHeight :: Num a => a
+mapHeight = 1024
+
+mapWidth :: Num a => a
+mapWidth = 1024
+
+mapQuadWidth :: Float
+mapQuadWidth = 10.0
+
+mapQuadHeight :: Float
+mapQuadHeight = 10.0
