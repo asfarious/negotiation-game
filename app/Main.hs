@@ -6,8 +6,10 @@ import qualified "GPipe-GLFW4" Graphics.GPipe.Context.GLFW as GLFW
 import                         Control.Monad                        (unless)
 import                         Control.Monad.IO.Class               (liftIO)
 import                         Control.Concurrent.STM
+import                         Data.Bool                            (bool)
 --
 import                         Constants
+import                         Texture
 
 main :: IO ()
 main =
@@ -48,11 +50,13 @@ loop vertexBuffer positionBuffer shader win position scrolledTVar debugTVar = do
   swapWindowBuffers win
 
   input <- getInput win debugTVar
+  toScrollKeyed <- scrollKey win
   toScroll <- liftIO $ atomically $ do
     scrolled <- readTVar scrolledTVar
     writeTVar scrolledTVar (0 :: Double)
     pure scrolled
-  let zoom :: Float = realToFrac $ toScroll * (negate zoomSpeed)
+  --liftIO $ putStrLn $ show scrollKeyed ++ " " ++ show toScroll
+  let zoom :: Float = realToFrac $ (toScroll * mouseScrollSensitivity + toScrollKeyed * keyScrollSensitivity) * (negate zoomSpeed)
   let position' = adjustZoom (position + input) zoom    
   
   toDebug <- liftIO $ atomically $ do
@@ -93,6 +97,17 @@ getInput win debugTVar = do
                                                 liftIO $ atomically $ writeTVar debugTVar True
                                                 pure $ V3 0 0 0
             [_,    _,    _,    _,       _] -> pure $ V3 0 0 0
+
+scrollKey :: Window os c ds -> ContextT GLFW.Handle os IO Double
+scrollKey win = (-) 
+                <$> fmap (bool 0 1) (isPressed win GLFW.Key'PadAdd) 
+                <*> fmap (bool 0 1) (isPressed win GLFW.Key'PadSubtract)
+{--
+scrollKey win = do
+        isPlus <- isPressed win GLFW.Key'PadAdd
+        isMinus <- isPressed win GLFW.Key'PadSubsract
+        pure (isPlus - isMinus)
+--}
 
 isPressed :: Window os c ds -> GLFW.Key -> ContextT GLFW.Handle os IO Bool
 isPressed win key = GLFW.getKey win key >>= \status -> case status of
