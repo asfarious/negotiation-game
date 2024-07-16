@@ -20,15 +20,16 @@ main =
     mapTexture <- importTexture mapPath mapHeight mapWidth
     
     vertexBuffer :: Buffer os (B4 Float, B2 Float) <- newBuffer 4
-    let mapQuadSize = (negate 10) :: Float
-    writeBuffer vertexBuffer 0 [ (V4 0           0           0 1, V2 0 0)
-                               , (V4 mapQuadSize 0           0 1, V2 1 0)
-                               , (V4 0           mapQuadSize 0 1, V2 0 1)
-                               , (V4 mapQuadSize mapQuadSize 0 1, V2 1 1)
+    --let mapQuadSize = (negate 10) :: Float
+    writeBuffer vertexBuffer 0 [ (V4 0            0 0             1, V2 0 0)
+                               , (V4 mapQuadWidth 0 0             1, V2 1 0)
+                               , (V4 0            0 mapQuadHeight 1, V2 0 1)
+                               , (V4 mapQuadWidth 0 mapQuadHeight 1, V2 1 1)
                                ]
                                
     positionBuffer :: Buffer os (Uniform (B3 Float)) <- newBuffer 1 -- Looking-at 2D-position + Zoom level
-    writeBuffer positionBuffer 0 [V3 0 0 0.5]
+    let initialPosition = V3 (mapQuadWidth/2) (mapQuadHeight/2) initialZoom
+    writeBuffer positionBuffer 0 [initialPosition]
     
     debugTVar :: TVar Bool <- liftIO $ atomically $ newTVar (False :: Bool)
     
@@ -37,10 +38,10 @@ main =
     
     shader <- compileShader $ do
       primitiveStream <- toPrimitiveStream id
-      (V3 x y s) <- getUniform $ const (positionBuffer, 0)
+      (V3 x z s) <- getUniform $ const (positionBuffer, 0)
       
       --let pointAt (V4 x y _ _) = V2 (x * convFactorX) (y * convFactorY)
-      let primitiveStream2 = fmap (\(point, texPos) -> (viewBoard (V3 x y 0) s point, texPos)) primitiveStream
+      let primitiveStream2 = fmap (\(point, texPos) -> (viewBoard (V3 x 0 z) s point, texPos)) primitiveStream
       fragmentStream <- rasterize (const (FrontAndBack, PolygonFill, ViewPort (V2 0 0) (V2 displayWidth displayHeight), DepthRange 0 1)) primitiveStream2
       
       let filter = SamplerFilter Nearest Nearest Nearest Nothing
@@ -52,7 +53,7 @@ main =
       
       drawWindowColor (const (win, ContextColorOption NoBlending (V3 True True True))) fragmentStreamTextured
 
-    loop vertexBuffer positionBuffer shader win (V3 0 0 0.5) scrolledTVar debugTVar
+    loop vertexBuffer positionBuffer shader win initialPosition scrolledTVar debugTVar
 
 loop vertexBuffer positionBuffer shader win position scrolledTVar debugTVar = do
   writeBuffer positionBuffer 0 [position]
@@ -71,7 +72,7 @@ loop vertexBuffer positionBuffer shader win position scrolledTVar debugTVar = do
     pure scrolled
   --liftIO $ putStrLn $ show scrollKeyed ++ " " ++ show toScroll
   let zoom :: Float = realToFrac $ (toScroll * mouseScrollSensitivity + toScrollKeyed * keyScrollSensitivity) * (negate zoomSpeed)
-  let position' = adjustZoom (position + input) zoom    
+  let position' = adjustZoom (position + input) zoom   
   
   toDebug <- liftIO $ atomically $ do
     toDebug' <- readTVar debugTVar
@@ -89,7 +90,7 @@ viewBoard :: Floating a => V3 a -> a -> V4 a -> V4 a
 viewBoard at zoom = ((projMat !*! lookMat) !*)
     where 
         projMat = perspective (pi/3) 1 1 100
-        lookMat = lookAt (at + zoom *^ (V3 0 (-2) 2)) at (V3 0 1 0)
+        lookMat = lookAt (at + zoom *^ (V3 0 1 1)) at (V3 0 1 0)
 
 adjustZoom :: V3 Float -> Float -> V3 Float
 adjustZoom (V3 x y s) zoom = V3 x y s'
@@ -100,13 +101,13 @@ mouseScrollCallback scrolledTVar xOffset yOffset = atomically $ modifyTVar' scro
         
 getInput :: Window os c ds -> TVar Bool -> ContextT GLFW.Handle os IO (V3 Float)
 getInput win debugTVar = do
-        let keys = [GLFW.Key'W, GLFW.Key'A, GLFW.Key'D, GLFW.Key'S, GLFW.Key'M]
+        let keys = [GLFW.Key'W, GLFW.Key'A, GLFW.Key'S, GLFW.Key'D, GLFW.Key'M]
         arePressed <- traverse (isPressed win) keys
         case arePressed of
-            [True, _,    _,    _,       _] -> pure $ V3  0                    cameraSpeed         0
-            [_,    True, _,    _,       _] -> pure $ V3 (negate cameraSpeed)  0                   0
-            [_,    _,    True, _,       _] -> pure $ V3  cameraSpeed          0                   0
-            [_,    _,    _,    True,    _] -> pure $ V3  0                   (negate cameraSpeed) 0
+            [True, _,    _,    _,       _] -> pure $ V3  0                    (negate cameraSpeed) 0
+            [_,    True, _,    _,       _] -> pure $ V3  (negate cameraSpeed) 0                    0
+            [_,    _,    True, _,       _] -> pure $ V3  0                    cameraSpeed          0
+            [_,    _,    _,    True,    _] -> pure $ V3  cameraSpeed          0                    0
             [_,    _,    _,    _,    True] -> do 
                                                 liftIO $ atomically $ writeTVar debugTVar True
                                                 pure $ V3 0 0 0
