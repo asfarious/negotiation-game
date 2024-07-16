@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       Constants
+      Texture
   other-modules:
       Paths_negotiation_game
   hs-source-dirs:
@@ -34,6 +35,7 @@ library
   build-depends:
       GPipe-Core
     , GPipe-GLFW4
+    , JuicyPixels
     , base >=4.7 && <5
     , containers
     , extra
@@ -51,6 +53,7 @@ executable negotiation-game-exe
   build-depends:
       GPipe-Core
     , GPipe-GLFW4
+    , JuicyPixels
     , base >=4.7 && <5
     , containers
     , extra
@@ -70,6 +73,7 @@ test-suite negotiation-game-test
   build-depends:
       GPipe-Core
     , GPipe-GLFW4
+    , JuicyPixels
     , base >=4.7 && <5
     , containers
     , extra

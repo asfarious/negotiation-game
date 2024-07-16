@@ -14,3 +14,9 @@ zoomSpeed = 0.1
 
 cameraSpeed :: Float
 cameraSpeed = 0.1
+
+mouseScrollSensitivity :: Double
+mouseScrollSensitivity = 1.0
+
+keyScrollSensitivity :: Double
+keyScrollSensitivity = 0.3

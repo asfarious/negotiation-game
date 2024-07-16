@@ -27,6 +27,7 @@ dependencies:
 - GPipe-GLFW4
 - lens
 - stm
+- JuicyPixels
 
 ghc-options:
 - -Wall
