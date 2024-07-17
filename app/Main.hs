@@ -74,12 +74,12 @@ main =
 loop vertexBuffer positionBuffer quadBuffer pointBuffer shader win position@(V3 _ _ s) scrolledTVar debugTVar = do
   maybeCur <- GLFW.getCursorPos win
   let cursor = case maybeCur of
-                            Just (x, y) -> V3 (realToFrac x * 2 / fromIntegral displayWidth - 1) 0 (realToFrac y * 2 / fromIntegral displayHeight - 1)
-                            Nothing     -> V3 0 0 0
+                            Just (x, y) -> V4 (realToFrac x * 2 / fromIntegral displayWidth - 1) (1 - realToFrac y * 2 / fromIntegral displayHeight) (-1) 1
+                            Nothing     -> V4 0 0 (-1) 1
 
   writeBuffer positionBuffer 0 [position]
   let unpackPosition (V3 x z _) = V3 x 0 z
-  let projectedCursor = normalizePoint $ projectFromScreen (unpackPosition position) s (point cursor)
+  let projectedCursor = normalizePoint $ projectFromScreen (unpackPosition position) s cursor
   writeBuffer pointBuffer 0 [(unpackPosition position, V3 1 0 0), (projectedCursor, V3 0 1 0)]
   
   render $ do
@@ -98,8 +98,8 @@ loop vertexBuffer positionBuffer quadBuffer pointBuffer shader win position@(V3 
   toScroll <- liftIO $ atomically $ do
     scrolled <- readTVar scrolledTVar
     writeTVar scrolledTVar (0 :: Double)
-    pure scrolled
-  liftIO $ putStrLn $ show cursor ++ " " ++ show projectedCursor
+    pure scrolled --
+  
   let zoom :: Float = realToFrac $ (toScroll * mouseScrollSensitivity + toScrollKeyed * keyScrollSensitivity) * (negate zoomSpeed)
   let position' = adjustZoom (position + input) zoom   
   
@@ -123,14 +123,14 @@ viewBoard at zoom = ((projMat !*! lookMat) !*)
         lookMat = lookAt (at + zoom *^ (V3 0 1 1)) at (V3 0 1 0)
 
 projectFromScreen :: Floating a => V3 a -> a -> V4 a -> V4 a
-projectFromScreen at zoom point = V4 x 0 z w -- + zoom *^ (V4 0 w w 0)
-    where 
-        V4 x y z w = invMat !* point
-        invMat = inv44 (projMat !*! lookMat)
-        invLookMat = inv44 lookMat
-        invProjMat = inv44 projMat
-        lookMat = lookAt (at + zoom *^ (V3 0 1 1)) at (V3 0 1 0)
-        projMat = perspective (pi/3) 1 1 100
+projectFromScreen at zoom p = point cameraPosition + (negate yCam / rayY) *^ rayDirection
+    where
+        cameraPosition@(V3 _ yCam _) = at + zoom *^ (V3 0 1 1)
+        invProjMat = inv44 $ perspective (pi/3) 1 1 100
+        invLookMat = inv44 $ lookAt cameraPosition at (V3 0 1 0)
+        (V4 xView yView _ _) = invProjMat !* p
+        rayDirection@(V4 _ rayY _ _) = invLookMat !* (V4 xView yView (-1) 0)
+        
 
 adjustZoom :: V3 Float -> Float -> V3 Float
 adjustZoom (V3 x y s) zoom = V3 x y s'
