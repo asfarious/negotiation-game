@@ -20,7 +20,6 @@ main =
     mapTexture <- importTexture mapPath mapHeight mapWidth
     
     vertexBuffer :: Buffer os (B4 Float, B2 Float) <- newBuffer 4
-    --let mapQuadSize = (negate 10) :: Float
     writeBuffer vertexBuffer 0 [ (V4 0            0 0             1, V2 0 0)
                                , (V4 mapQuadWidth 0 0             1, V2 1 0)
                                , (V4 0            0 mapQuadHeight 1, V2 0 1)
@@ -33,11 +32,22 @@ main =
     
     debugTVar :: TVar Bool <- liftIO $ atomically $ newTVar (False :: Bool)
     
+    quadBuffer :: Buffer os (B4 Float) <- newBuffer 4       -- a quad that will then be rotated, scaled, translated,
+    writeBuffer quadBuffer 0 ([ V4   0.1  0 (-0.1) 1        -- and colored for debug purposes
+                             ,  V4   0.1  0  0.1   1
+                             ,  V4 (-0.1) 0 (-0.1) 1
+                             ,  V4 (-0.1) 0  0.1   1
+                             ] :: [V4 Float])
+    pointBuffer :: Buffer os (B3 Float, B3 Float) <- newBuffer 800 -- position + color
+    
+    
     scrolledTVar :: TVar Double <- liftIO $ atomically $ newTVar (0 :: Double)
     GLFW.setScrollCallback win $ Just $ mouseScrollCallback scrolledTVar
     
+    
     shader <- compileShader $ do
-      primitiveStream <- toPrimitiveStream id
+      primitiveStream <- toPrimitiveStream fst
+      primitivePoints <- toPrimitiveStream snd
       (V3 x z s) <- getUniform $ const (positionBuffer, 0)
       
       --let pointAt (V4 x y _ _) = V2 (x * convFactorX) (y * convFactorY)
@@ -51,17 +61,36 @@ main =
       let sampleTexture = sample2D sampler SampleAuto Nothing Nothing
           fragmentStreamTextured = fmap sampleTexture fragmentStream
       
+      --Debug points --
+      let primitivePoints2 = fmap (\(offset, vertex, color) -> (viewBoard (V3 x 0 z) s (vector offset + vertex), color)) primitivePoints
+      fragmentStreamPoints <- rasterize (const (FrontAndBack, PolygonFill, ViewPort (V2 0 0) (V2 displayWidth displayHeight), DepthRange 0 1)) primitivePoints2
+        
+      -- Actually drawing --
       drawWindowColor (const (win, ContextColorOption NoBlending (V3 True True True))) fragmentStreamTextured
+      drawWindowColor (const (win, ContextColorOption NoBlending (V3 True True True))) fragmentStreamPoints
 
-    loop vertexBuffer positionBuffer shader win initialPosition scrolledTVar debugTVar
+    loop vertexBuffer positionBuffer quadBuffer pointBuffer shader win initialPosition scrolledTVar debugTVar
 
-loop vertexBuffer positionBuffer shader win position scrolledTVar debugTVar = do
+loop vertexBuffer positionBuffer quadBuffer pointBuffer shader win position@(V3 _ _ s) scrolledTVar debugTVar = do
+  maybeCur <- GLFW.getCursorPos win
+  let cursor = case maybeCur of
+                            Just (x, y) -> V3 (realToFrac x * 2 / fromIntegral displayWidth - 1) 0 (realToFrac y * 2 / fromIntegral displayHeight - 1)
+                            Nothing     -> V3 0 0 0
+
   writeBuffer positionBuffer 0 [position]
+  let unpackPosition (V3 x z _) = V3 x 0 z
+  let projectedCursor = normalizePoint $ projectFromScreen (unpackPosition position) s (point cursor)
+  writeBuffer pointBuffer 0 [(unpackPosition position, V3 1 0 0), (projectedCursor, V3 0 1 0)]
+  
   render $ do
     clearWindowColor win (V3 1 1 1)
     vertexArray <- newVertexArray vertexBuffer
+    pointArray <- takeVertices 2 <$> newVertexArray pointBuffer
+    quadArray <- newVertexArray quadBuffer
     let primitiveArray = toPrimitiveArray TriangleStrip vertexArray
-    shader primitiveArray
+    let pointPrimitives = toPrimitiveArrayInstanced TriangleStrip (\vertex (offset, color) -> (offset, vertex, color)) quadArray pointArray
+    
+    shader (primitiveArray, pointPrimitives)
   swapWindowBuffers win
 
   input <- getInput win debugTVar
@@ -70,7 +99,7 @@ loop vertexBuffer positionBuffer shader win position scrolledTVar debugTVar = do
     scrolled <- readTVar scrolledTVar
     writeTVar scrolledTVar (0 :: Double)
     pure scrolled
-  --liftIO $ putStrLn $ show scrollKeyed ++ " " ++ show toScroll
+  liftIO $ putStrLn $ show cursor ++ " " ++ show projectedCursor
   let zoom :: Float = realToFrac $ (toScroll * mouseScrollSensitivity + toScrollKeyed * keyScrollSensitivity) * (negate zoomSpeed)
   let position' = adjustZoom (position + input) zoom   
   
@@ -84,13 +113,24 @@ loop vertexBuffer positionBuffer shader win position scrolledTVar debugTVar = do
   
   closeRequested <- GLFW.windowShouldClose win
   unless (closeRequested == Just True) $
-    loop vertexBuffer positionBuffer shader win position' scrolledTVar debugTVar
+    loop vertexBuffer positionBuffer quadBuffer pointBuffer shader win position' scrolledTVar debugTVar
+
     
 viewBoard :: Floating a => V3 a -> a -> V4 a -> V4 a
 viewBoard at zoom = ((projMat !*! lookMat) !*)
     where 
         projMat = perspective (pi/3) 1 1 100
         lookMat = lookAt (at + zoom *^ (V3 0 1 1)) at (V3 0 1 0)
+
+projectFromScreen :: Floating a => V3 a -> a -> V4 a -> V4 a
+projectFromScreen at zoom point = V4 x 0 z w -- + zoom *^ (V4 0 w w 0)
+    where 
+        V4 x y z w = invMat !* point
+        invMat = inv44 (projMat !*! lookMat)
+        invLookMat = inv44 lookMat
+        invProjMat = inv44 projMat
+        lookMat = lookAt (at + zoom *^ (V3 0 1 1)) at (V3 0 1 0)
+        projMat = perspective (pi/3) 1 1 100
 
 adjustZoom :: V3 Float -> Float -> V3 Float
 adjustZoom (V3 x y s) zoom = V3 x y s'
