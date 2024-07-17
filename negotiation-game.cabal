@@ -26,6 +26,9 @@ source-repository head
 library
   exposed-modules:
       Constants
+      Input
+      Projection
+      Shading
       Texture
   other-modules:
       Paths_negotiation_game
