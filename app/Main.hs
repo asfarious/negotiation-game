@@ -6,12 +6,16 @@ import qualified "GPipe-GLFW4" Graphics.GPipe.Context.GLFW as GLFW
 import                         Control.Monad                        (unless)
 import                         Control.Monad.IO.Class               (MonadIO(..), liftIO)
 import                         Control.Concurrent.STM
+import qualified               Data.Sequence               as Seq   (empty)
+import                         Data.Sequence                        (Seq(..))
 --
 import                         Constants
 import                         Texture
 import                         Shading
 import                         Projection                           (projectToBoard)
 import                         Input
+import                         States
+import                         Events
 
 main :: IO ()
 main =
@@ -24,13 +28,24 @@ main =
     let initialPosition = V3 (mapQuadWidth/2) (mapQuadHeight/2) initialZoom
     writeBuffer positionBuffer 0 [initialPosition]
     
-    debugTVar :: TVar Bool <- liftIO $ atomically $ newTVar (False :: Bool)
-    scrolledTVar :: TVar Double <- liftIO $ atomically $ newTVar (0 :: Double)
-    GLFW.setScrollCallback win $ Just $ mouseScrollCallback scrolledTVar
+    isStrTVar'   :: TVar Bool       <- liftIO $ atomically $ newTVar (False :: Bool)
+    strTVar'    :: TVar String      <- liftIO $ atomically $ newTVar ([] :: String)
+    scrollTVar' :: TVar Double      <- liftIO $ atomically $ newTVar (0 :: Double)
+    let inputTVars = MkInputTVars { scrollTVar = scrollTVar'
+                                  , strTVar    = strTVar'
+                                  , isStrTVar  = isStrTVar'
+                                  }
+    GLFW.setScrollCallback win $ Just $ mouseScrollCallback scrollTVar'
+    GLFW.setCharCallback win $ Just $ keyboardCallback strTVar' isStrTVar'
     
     shader <- compileShader $ boardShader win positionBuffer mapTexture
+    
+    let mapState = MkMapState { position = initialPosition
+                              , cursor   = Just (V4 0 0 0 1)
+                              , mapMode  = RawMapMode
+                              }
       
-    gameLoop vertexBuffer positionBuffer quadBuffer rectBuffer shader win initialPosition scrolledTVar debugTVar
+    gameLoop vertexBuffer positionBuffer quadBuffer rectBuffer shader win mapState inputTVars
 
 initializeBuffers :: (ContextHandler ctx, MonadIO m) => ContextT ctx os m 
                  (Buffer os (B4 Float, B2 Float), 
@@ -61,17 +76,24 @@ initializeBuffers = do
     pure (vertexBuffer, quadBuffer, rectBuffer, positionBuffer) 
 
 
-gameLoop vertexBuffer positionBuffer quadBuffer pointBuffer shader win position@(V3 _ _ s) scrolledTVar debugTVar = do
-    maybeCur <- GLFW.getCursorPos win
-    let cursor = case maybeCur of
-                            Just (x, y) -> V4 (realToFrac x * 2 / fromIntegral displayWidth - 1) (1 - realToFrac y * 2 / fromIntegral displayHeight) (-1) 1
-                            Nothing     -> V4 0 0 (-1) 1
+gameLoop vertexBuffer positionBuffer quadBuffer pointBuffer shader win mapState inputTVars = do
+    -- Collect input --
+    input <- collectInput win inputTVars
+
+    -- Process events arising from input --
+    let (mapState', debugIO) = processEvents mapState input
     
-    writeBuffer positionBuffer 0 [position]
+    -- Move the data to the GPU buffers --
+    let cursorPointer = case cursor mapState' of
+                            Just cur -> normalizePoint cur
+                            Nothing  -> V3 0 0 0
+    _ <- liftIO $ debugIO
+    
+    writeBuffer positionBuffer 0 [position mapState']
     let unpackPosition (V3 x z _) = V3 x 0 z
-    let projectedCursor = normalizePoint $ projectToBoard (unpackPosition position) s cursor
-    writeBuffer pointBuffer 0 [(unpackPosition position, V3 1 0 0), (projectedCursor, V3 0 1 0)]
-  
+    writeBuffer pointBuffer 0 [(unpackPosition . position $ mapState', V3 1 0 0), (cursorPointer, V3 0 1 0)]
+    
+    -- Render the state --
     render $ do
         clearWindowColor win (V3 1 1 1)
         vertexArray <- newVertexArray vertexBuffer
@@ -82,30 +104,8 @@ gameLoop vertexBuffer positionBuffer quadBuffer pointBuffer shader win position@
         shader (primitiveArray, pointPrimitives)
   
     swapWindowBuffers win
-
-    input <- getInput win debugTVar
-    toScrollKeyed <- scrollKey win
-    toScroll <- liftIO $ atomically $ do
-        scrolled <- readTVar scrolledTVar
-        writeTVar scrolledTVar (0 :: Double)
-        pure scrolled
-  
-    let zoom :: Float = realToFrac $ (toScroll * mouseScrollSensitivity + toScrollKeyed * keyScrollSensitivity) * (negate zoomSpeed)
-    let position' = adjustZoom (position + input) zoom   
-  
-    toDebug <- liftIO $ atomically $ do
-        toDebug' <- readTVar debugTVar
-        writeTVar debugTVar (False :: Bool)
-        pure toDebug'
-    if toDebug 
-        then liftIO $ putStrLn $ show position
-        else pure ()
-  
+    
+    -- Do another iteration --
     closeRequested <- GLFW.windowShouldClose win
     unless (closeRequested == Just True) $
-        gameLoop vertexBuffer positionBuffer quadBuffer pointBuffer shader win position' scrolledTVar debugTVar
-        
-
-adjustZoom :: V3 Float -> Float -> V3 Float
-adjustZoom (V3 x y s) zoom = V3 x y s'
-    where s' = max (s + zoom) zoomMinBound
+        gameLoop vertexBuffer positionBuffer quadBuffer pointBuffer shader win mapState' inputTVars
