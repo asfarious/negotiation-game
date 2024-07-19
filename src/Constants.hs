@@ -7,7 +7,7 @@ displayWidth = 1280
 displayHeight = 960
 
 zoomMinBound :: Float
-zoomMinBound = 1.1
+zoomMinBound = 1.2
 
 initialZoom :: Float
 initialZoom = 10*zoomMinBound
