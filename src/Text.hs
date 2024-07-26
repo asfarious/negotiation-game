@@ -39,7 +39,7 @@ textFinish = ft_Done_FreeType
 loadFont :: (ContextHandler ctx, MonadIO m) => FT_Library -> FilePath -> Size2 -> ContextT ctx os m (FontAtlas os)
 loadFont ft path size = do
                             face  <- liftIO $ ft_New_Face ft path 0
-                            liftIO $ ft_Set_Char_Size face 0 (12*64) 0 0
+                            liftIO $ ft_Set_Char_Size face 0 (20*64) 0 0
                             atlas <- newTexture2D R8 size 1
                             writeTexture2D atlas 0 0 size $ repeat (0 :: Float)
                             pure $ MkFont (face, HM.empty, atlas, size, V3 0 0 0)
@@ -78,7 +78,7 @@ loadCharacter font@(MkFont (face, reg, atlas, size@(V2 atlasW atlasH), V3 offset
                                         let offsetY' = offsetY + lineH
                                         writeTexture2D atlas 0 (V2 0 offsetY') bitmapSize bitmapBufferNormalized
                                         let reg' = HM.insert ch (V2 0 offsetY', V2 width height, typography) reg
-                                        pure . Just $ MkFont (face, reg', atlas, size, V3 0 offsetY' height)
+                                        pure . Just $ MkFont (face, reg', atlas, size, V3 width offsetY' height)
 
 loadCharacters :: (ContextHandler ctx, MonadIO m) => FontAtlas os -> [Char] -> ContextT ctx os m (Maybe (FontAtlas os))
 loadCharacters font = foldM go (Just font)
