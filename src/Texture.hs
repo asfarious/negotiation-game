@@ -24,7 +24,10 @@ importTexture filePath height width = do
 getTextureRaw :: FilePath -> IO [(V3 Word16)]
 getTextureRaw filePath = JP.readPng filePath >>= \x -> case x of
         Prelude.Left  _            -> error "YOU FORGOT YOUR SPRITES MATE"
-        Prelude.Right dynamicImage -> pure . fmap pixelToVector . extractPixels . JP.convertRGB16 $ dynamicImage
-                where pixelToVector (JP.PixelRGB16 r g b) = V3 r g b -- r, g, b are just Word16 values
-                      extractPixels image = [ JP.pixelAt image x y | y <- [0..(JP.imageHeight image - 1)], x <- [0..(JP.imageWidth image - 1)] ] 
-                      -- EXTREMELY SUGARY
+        Prelude.Right dynamicImage -> pure . fromImage . JP.convertRGB16 $ dynamicImage
+                      
+fromImage :: JP.Image JP.PixelRGB16 -> [V3 Word16]
+fromImage = fmap pixelToVector . extractPixels
+    where pixelToVector (JP.PixelRGB16 r g b) = V3 r g b -- r, g, b are just Word16 values
+          extractPixels image = [ JP.pixelAt image x y | y <- [0..(JP.imageHeight image - 1)], x <- [0..(JP.imageWidth image - 1)] ] 
+          -- EXTREMELY SUGARY

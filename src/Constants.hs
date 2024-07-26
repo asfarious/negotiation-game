@@ -38,3 +38,6 @@ mapQuadWidth = 10.0
 
 mapQuadHeight :: Float
 mapQuadHeight = 10.0
+
+defaultFontFile :: FilePath
+defaultFontFile = ""
