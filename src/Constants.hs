@@ -40,4 +40,4 @@ mapQuadHeight :: Float
 mapQuadHeight = 10.0
 
 defaultFontFile :: FilePath
-defaultFontFile = ""
+defaultFontFile = "data/font/NotoSans-Regular.ttf"
