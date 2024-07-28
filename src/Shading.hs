@@ -38,3 +38,25 @@ boardShader win positionBuffer mapTexture = do
     -- Actually drawing --
     drawWindowColor (const (win, ContextColorOption NoBlending (V4 True True True True))) fragmentStreamTextured
     drawWindowColor (const (win, ContextColorOption NoBlending (V4 True True True True))) fragmentStreamPoints
+
+textShader :: Window os RGBAFloat ds
+           -> Texture2D os (Format RFloat)
+           -- -> V3 Float -- TODO: add the text color as a parameter of some sort
+           -> Shader os (PrimitiveArray Triangles (B3 Float, B4 Float, B2 Float, B4 Float)) ()
+textShader win atlasTex = do -- (V3 rColor gColor bColor) = do
+    primitiveStream <- toPrimitiveStream id
+    let primitiveStream2 = fmap (\(pos, vertex@(V4 vertX vertY vertZ vertW), V2 width height, V4 offsetX offsetY texWidth texHeight) 
+                            -> (vector pos + V4 (vertX*width) (negate vertY*height) vertZ vertW, V2 (offsetX + vertX*texWidth) (offsetY + vertY*texHeight)))
+                                primitiveStream
+    fragmentStream <- rasterize (const (FrontAndBack, PolygonFill, ViewPort (V2 0 0) (V2 displayWidth displayHeight), DepthRange 0 1)) primitiveStream2
+    
+    let filter = SamplerFilter Linear Linear Linear Nothing
+        edge = (pure ClampToBorder, 1)
+    sampler <- newSampler2D $ const (atlasTex, filter, edge)
+    
+    let sampleAtlas = sample2D sampler SampleAuto Nothing Nothing
+        bitmapToColor = \alpha -> V4 0 0 0 alpha
+        fragmentStreamTextured = fmap (bitmapToColor . sampleAtlas) fragmentStream
+    
+    let blending = BlendRgbAlpha (FuncAdd, FuncAdd) (BlendingFactors SrcAlpha OneMinusSrcAlpha, BlendingFactors One Zero) (V4 0 0 0 0)
+    drawWindowColor (const (win, ContextColorOption blending (V4 True True True True))) fragmentStreamTextured
