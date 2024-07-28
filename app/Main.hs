@@ -151,9 +151,17 @@ gameLoop vertexBuffer positionBuffer quadBuffer pointBuffer textQuadBuffer charB
     
     -- Do another iteration --
     closeRequested <- GLFW.windowShouldClose win
+    if (closeRequested == Just True) -- I hope this strange way to do cleanup helps GHC to optimize the recursion into a loop
+        then cleanup freetype defaultFont
+        else pure ()
+        
     unless (closeRequested == Just True) $ 
         gameLoop vertexBuffer positionBuffer quadBuffer pointBuffer textQuadBuffer charBuffer
                  shadeBoard shadeText win testLength
                  mapState' 
                  inputTVars 
                  freetype defaultFont defaultChar  
+                 
+cleanup freetype defaultFont = do
+                                unloadFont defaultFont
+                                liftIO $ textFinish freetype
