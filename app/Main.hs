@@ -20,7 +20,7 @@ import                         Events
 main :: IO ()
 main =
   runContextT GLFW.defaultHandleConfig $ do
-    win <- newWindow (WindowFormatColor RGB16) 
+    win <- newWindow (WindowFormatColor RGBA8) 
         (GLFW.WindowConfig displayWidth displayHeight "The Negotiation Game" Nothing [GLFW.WindowHint'Resizable False] Nothing)
     
     mapTexture <- importTexture mapPath mapHeight mapWidth
@@ -50,7 +50,7 @@ main =
 initializeBuffers :: (ContextHandler ctx, MonadIO m) => ContextT ctx os m 
                  (Buffer os (B4 Float, B2 Float), 
                   Buffer os (B4 Float), 
-                  Buffer os (B3 Float, B3 Float), 
+                  Buffer os (B3 Float, B4 Float), 
                   Buffer os (Uniform (B3 Float)))
 initializeBuffers = do
     vertexBuffer :: Buffer os (B4 Float, B2 Float) <- newBuffer 4
@@ -67,8 +67,8 @@ initializeBuffers = do
                              ,  V4 (-0.1) 0  0.1   1
                              ] :: [V4 Float])
                              
-    rectBuffer :: Buffer os (B3 Float, B3 Float) <- newBuffer 800 -- position + color
-    writeBuffer rectBuffer 0 $ repeat (V3 0 0 0, V3 0 0 0)
+    rectBuffer :: Buffer os (B3 Float, B4 Float) <- newBuffer 800 -- position + color
+    writeBuffer rectBuffer 0 $ repeat (V3 0 0 0 , V4 0 0 0 0)
     
     positionBuffer :: Buffer os (Uniform (B3 Float)) <- newBuffer 1 -- Looking-at 2D-position + Zoom level
     writeBuffer positionBuffer 0 [0]
@@ -91,11 +91,11 @@ gameLoop vertexBuffer positionBuffer quadBuffer pointBuffer shader win mapState 
     
     writeBuffer positionBuffer 0 [position mapState']
     let unpackPosition (V3 x z _) = V3 x 0 z
-    writeBuffer pointBuffer 0 [(unpackPosition . position $ mapState', V3 1 0 0), (cursorPointer, V3 0 1 0)]
+    writeBuffer pointBuffer 0 [(unpackPosition . position $ mapState', (V4 1 0 0 1 :: V4 Float)), (cursorPointer, V4 0 1 0 1)]
     
     -- Render the state --
     render $ do
-        clearWindowColor win (V3 1 1 1)
+        clearWindowColor win (V4 1 1 1 1)
         vertexArray <- newVertexArray vertexBuffer
         pointArray <- takeVertices 2 <$> newVertexArray pointBuffer
         quadArray <- newVertexArray quadBuffer

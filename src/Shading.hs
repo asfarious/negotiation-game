@@ -7,10 +7,10 @@ import qualified "GPipe-GLFW4" Graphics.GPipe.Context.GLFW as GLFW
 import                         Constants
 import                         Projection                          (viewBoard)
 
-boardShader :: Window os RGBFloat ds
+boardShader :: Window os RGBAFloat ds
           -> Buffer os (Uniform (B3 Float))
-          -> Texture2D os (Format RGBFloat)
-          -> Shader os (PrimitiveArray Triangles (B4 Float, B2 Float), PrimitiveArray Triangles (B3 Float, B4 Float, B3 Float)) ()
+          -> Texture2D os (Format RGBAFloat)
+          -> Shader os (PrimitiveArray Triangles (B4 Float, B2 Float), PrimitiveArray Triangles (B3 Float, B4 Float, B4 Float)) ()
 boardShader win positionBuffer mapTexture = do
 
     --Stream initialization --
@@ -36,5 +36,5 @@ boardShader win positionBuffer mapTexture = do
     fragmentStreamPoints <- rasterize (const (FrontAndBack, PolygonFill, ViewPort (V2 0 0) (V2 displayWidth displayHeight), DepthRange 0 1)) primitivePoints2
         
     -- Actually drawing --
-    drawWindowColor (const (win, ContextColorOption NoBlending (V3 True True True))) fragmentStreamTextured
-    drawWindowColor (const (win, ContextColorOption NoBlending (V3 True True True))) fragmentStreamPoints
+    drawWindowColor (const (win, ContextColorOption NoBlending (V4 True True True True))) fragmentStreamTextured
+    drawWindowColor (const (win, ContextColorOption NoBlending (V4 True True True True))) fragmentStreamPoints
