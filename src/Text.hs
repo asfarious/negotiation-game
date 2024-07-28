@@ -4,6 +4,7 @@ module Text where
 import                         Graphics.GPipe                                            
 import                         FreeType                         -- as FT -- the FreeType stuff is already prefixed with ft_ and FT_
 import                         Data.Word                                 (Word8)
+import                         Data.List                                 (foldl')
 import qualified               Data.HashMap.Strict              as HM
 import                         Control.Monad.IO.Class                    (MonadIO(..), liftIO)
 import                         Control.Monad                             (foldM)
@@ -12,6 +13,7 @@ import                         Foreign                                   (peek, 
 import                         Constants
 
 newtype DisplayChar = MkDisplayChar ( V4 Float -- in relative units: atlas offset, width and height of the sprite
+                                    , V2 Float -- width and height in pixels, not to calculate it twice
                                     , V3 Float -- in pixels: xBearing, yBearing, advance
                                     )
 
@@ -39,7 +41,7 @@ textFinish = ft_Done_FreeType
 loadFont :: (ContextHandler ctx, MonadIO m) => FT_Library -> FilePath -> Size2 -> ContextT ctx os m (FontAtlas os)
 loadFont ft path size = do
                             face  <- liftIO $ ft_New_Face ft path 0
-                            liftIO $ ft_Set_Char_Size face 0 (20*64) 0 0
+                            liftIO $ ft_Set_Char_Size face 0 (80*64) 0 0
                             atlas <- newTexture2D R8 size 1
                             writeTexture2D atlas 0 0 size $ repeat (0 :: Float)
                             pure $ MkFont (face, HM.empty, atlas, size, V3 0 0 0)
@@ -82,7 +84,7 @@ loadCharacter font@(MkFont (face, reg, atlas, size@(V2 atlasW atlasH), V3 offset
 
 toDisplayChar :: Int -> Int -> Int -> Int -> V3 Int -> Int -> Int -> DisplayChar
 toDisplayChar offsetX offsetY width height typography atlasW atlasH 
-    = MkDisplayChar (V4 (relativeX offsetX) (relativeY offsetY) (relativeX width) (relativeY height), typography')
+    = MkDisplayChar (V4 (relativeX offsetX) (relativeY offsetY) (relativeX width) (relativeY height), V2 (fromIntegral width) (fromIntegral height), typography')
         where
             relativeX x = fromIntegral x / fromIntegral atlasW
             relativeY y = fromIntegral y / fromIntegral atlasH
@@ -106,10 +108,14 @@ getCharacterDefault :: FontAtlas os -> DisplayChar -> Char -> DisplayChar
 getCharacterDefault (MkFont (_, reg, _, _, _)) df ch = HM.lookupDefault df ch reg
 
 
-makeTextSprites :: FontAtlas os -> V3 Float -> Float -> Float -> DisplayChar -> [Char] -> [(V3 Float, V4 Float)] -- 3D-position + atlas offset + atlas chunk size
-makeTextSprites font at xResolution yResolution defaultChar = fst . foldr go ([], 0)
+makeTextSprites :: FontAtlas os -> V3 Float -> Float -> Float -> DisplayChar -> [Char] -> [(V3 Float, V2 Float, V4 Float)] 
+-- 3D-position + sprite size + atlas offset + atlas chunk size
+makeTextSprites font at xResolution yResolution defaultChar = fst . foldl' go ([], 0)
     where
-         go :: Char -> ([(V3 Float, V4 Float)], Float) -> ([(V3 Float, V4 Float)], Float)
-         go ch (sprites, xPos) = case getCharacterDefault font defaultChar ch of
-                                MkDisplayChar (atlasPos, V3 xBearing yBearing advance) 
-                                    -> ((at + V3 ((xPos + xBearing)/xResolution) (yBearing/yResolution) 0, atlasPos) : sprites, xPos + advance)
+         go :: ([(V3 Float, V2 Float, V4 Float)], Float) -> Char -> ([(V3 Float, V2 Float, V4 Float)], Float)
+         go (sprites, xPos) ch = case getCharacterDefault font defaultChar ch of
+                                MkDisplayChar (atlasPos, V2 width height, V3 xBearing yBearing advance) 
+                                    -> ((at + V3 ((xPos + xBearing)/xResolution) (yBearing/yResolution) 0
+                                        , V2 (width / xResolution) (height/yResolution)
+                                        , atlasPos) 
+                                            : sprites, xPos + advance)
