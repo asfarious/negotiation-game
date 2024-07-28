@@ -8,11 +8,12 @@ import                         Control.Monad.IO.Class               (MonadIO(..)
 import                         Control.Concurrent.STM
 import qualified               Data.Sequence               as Seq   (empty)
 import                         Data.Sequence                        (Seq(..))
+import                         Text.Printf                          (printf)
 --
 import                         Constants
 import                         Texture
 import                         Shading
-import                         Projection                           (projectToBoard)
+import                         Projection                           (projectToBoard, relativePos)
 import                         Input
 import                         States
 import                         Events
@@ -31,7 +32,8 @@ main =
     
     freetype <- liftIO $ textInit
     defaultFont <- loadFont freetype defaultFontFile (V2 mapWidth mapHeight) 
-    maybeDefaultFont' <- loadCharacters defaultFont  ("#" ++ ['0'..'9'] ++ ['A'..'Z'] ++ ['А'..'Я'] ++ ['a'..'z'] ++ ['а'..'я'] ++ "!?.,() ")
+    maybeDefaultFont' <- loadCharacters defaultFont ("#.,()!" ++ ['0'..'9'] ++ ['A'..'Z'] ++ "?" ++ ['А'..'Я'] ++ ['a'..'z'] ++ ['а'..'я'] ++ " +-_=:;")
+
     let defaultFont' = case maybeDefaultFont' of
                         Just font -> font
                         Nothing   -> error "FONT ERROR!!!"
@@ -57,15 +59,11 @@ main =
                               , cursor   = Just (V4 0 0 0 1)
                               , mapMode  = RawMapMode
                               }
-    
-    let testString = "Test string. Тестовая строка!"
-        testLength = length testString
-        testText = makeTextSprites defaultFont' (V3 0 0 0) (fromIntegral displayWidth) (fromIntegral displayHeight) defaultChar testString
-    writeBuffer charBuffer 0 testText
+                              
     
     
     gameLoop vertexBuffer positionBuffer quadBuffer rectBuffer textQuadBuffer charBuffer 
-             shadeBoard shadeText win testLength
+             shadeBoard shadeText win
              mapState 
              inputTVars 
              freetype defaultFont' defaultChar
@@ -112,7 +110,7 @@ initializeBuffers = do
 
 
 gameLoop vertexBuffer positionBuffer quadBuffer pointBuffer textQuadBuffer charBuffer
-         shadeBoard shadeText win testLength
+         shadeBoard shadeText win
          mapState 
          inputTVars 
          freetype defaultFont defaultChar = do
@@ -132,6 +130,16 @@ gameLoop vertexBuffer positionBuffer quadBuffer pointBuffer textQuadBuffer charB
     let unpackPosition (V3 x z _) = V3 x 0 z
     writeBuffer pointBuffer 0 [(unpackPosition . position $ mapState', (V4 1 0 0 1 :: V4 Float)), (cursorPointer, V4 0 1 0 1)]
     
+    let
+        cur2DText = case cursorPosition input of
+                V2 x y -> "2D Cursor: " ++ printf "%.2f, %.2f" x y
+        cur3DText = case cursorPointer of
+                V3 x y z -> "3D Cursor: " ++ printf "%.2f, %.2f, %2f" x y z
+        textLength = length cur2DText + length cur3DText
+        cur2DTextSprites = makeTextSprites defaultFont (relativePos 5 80) (fromIntegral displayWidth) (fromIntegral displayHeight) defaultChar cur2DText
+        cur3DTextSprites = makeTextSprites defaultFont (relativePos 5 160) (fromIntegral displayWidth) (fromIntegral displayHeight) defaultChar cur3DText
+    writeBuffer charBuffer 0 $ cur2DTextSprites ++ cur3DTextSprites
+        
     -- Render the state --
     render $ do
         clearWindowColor win (V4 1 1 1 1)
@@ -143,7 +151,7 @@ gameLoop vertexBuffer positionBuffer quadBuffer pointBuffer textQuadBuffer charB
         shadeBoard (primitiveArray, pointPrimitives)
         
         textQuadArray <- newVertexArray textQuadBuffer
-        charArray <- takeVertices testLength <$> newVertexArray charBuffer
+        charArray <- takeVertices textLength <$> newVertexArray charBuffer
         let charPrimitives = toPrimitiveArrayInstanced TriangleStrip (\vertex (pos, size, atlasPos) -> (pos, vertex, size, atlasPos)) textQuadArray charArray
         shadeText charPrimitives
   
@@ -157,7 +165,7 @@ gameLoop vertexBuffer positionBuffer quadBuffer pointBuffer textQuadBuffer charB
         
     unless (closeRequested == Just True) $ 
         gameLoop vertexBuffer positionBuffer quadBuffer pointBuffer textQuadBuffer charBuffer
-                 shadeBoard shadeText win testLength
+                 shadeBoard shadeText win
                  mapState' 
                  inputTVars 
                  freetype defaultFont defaultChar  
