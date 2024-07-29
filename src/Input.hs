@@ -7,7 +7,6 @@ import                         Control.Monad                        (filterM)
 import                         Control.Monad.IO.Class               (MonadIO(..), liftIO)
 import                         Control.Concurrent.STM
 import                         Data.Bool                            (bool)
-import                         Data.Sequence
 
 import                         Constants
 
@@ -18,7 +17,7 @@ collectInput win inputTVars = do
                             Just (x, y) -> V2 (realToFrac x * 2 / fromIntegral displayWidth - 1) (1 - realToFrac y * 2 / fromIntegral displayHeight)
                             Nothing     -> V2 0 0
     
-    keyInput :: [GLFW.Key] <- pollWith isKeyPressed win allPossible
+    keyInput :: [GLFW.Key] <- pollWith isKeyPressed win allKeys
     mouseInput :: [GLFW.MouseButton] <- pollWith isMBPressed win allPossible
     toScroll <- liftIO $ atomically $ do
         scrolled <- readTVar $ scrollTVar inputTVars
@@ -32,7 +31,10 @@ collectInput win inputTVars = do
                    }
 
 allPossible :: (Enum a, Bounded a) => [a]
-allPossible = enumFrom (succ minBound)
+allPossible = enumFrom minBound
+
+allKeys :: [GLFW.Key] -- GLFW.Key'Unknown is not an actual key
+allKeys = drop 1 allPossible
 
 pollWith :: (MonadIO m) => (Window os c ds -> a -> ContextT GLFW.Handle os m Bool) -> Window os c ds -> [a] -> ContextT GLFW.Handle os m [a]
 pollWith isOk win = filterM (isOk win)
