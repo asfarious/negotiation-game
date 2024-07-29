@@ -29,6 +29,8 @@ library
       Events
       Input
       Projection
+      RenderBoard
+      RenderGUI
       Shading
       States
       Text

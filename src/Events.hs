@@ -1,15 +1,15 @@
 {-# LANGUAGE ScopedTypeVariables, PackageImports, TypeFamilies #-}   
-module Events where
+module Events (processEvents) where
 
 import                         Graphics.GPipe
-import qualified "GPipe-GLFW4" Graphics.GPipe.Context.GLFW as GLFW (Key(..))
+import qualified "GPipe-GLFW4" Graphics.GPipe.Context.GLFW as GLFW (Key(..), MouseButton(..))
 import                         Constants
 import                         States
 import                         Input
 import                         Projection                          (projectCursor)
 
 processEvents :: MapState -> Input -> (MapState, IO ())
-processEvents (MkMapState pos _ mMode)  input = (MkMapState pos' (Just cursor) mMode, putStr debug)
+processEvents (MkMapState pos _ mMode) input = (MkMapState pos' (Just cursor) mMode, putStr debug)
     where (keyboardMovement, debug) = case keyboardInput input of
                                         Right charInput -> foldr go (V3 0 0 0, []) charInput
                                         Left textInput  -> (V3 0 0 0, [])

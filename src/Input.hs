@@ -1,12 +1,16 @@
 {-# LANGUAGE ScopedTypeVariables, PackageImports, TypeFamilies #-}   
-module Input where
+module Input ( Input(..)
+             , InputTVars(..)
+             , collectInput
+             , keyboardCallback
+             , mouseScrollCallback
+             ) where
 
 import                         Graphics.GPipe
 import qualified "GPipe-GLFW4" Graphics.GPipe.Context.GLFW as GLFW
 import                         Control.Monad                        (filterM)
 import                         Control.Monad.IO.Class               (MonadIO(..), liftIO)
 import                         Control.Concurrent.STM
-import                         Data.Bool                            (bool)
 
 import                         Constants
 
@@ -58,7 +62,7 @@ keyboardCallback textTVar isTextTVar =
             True  -> modifyTVar' textTVar (++[c]) -- TODO: Replace String with Text
 
 mouseScrollCallback :: TVar Double -> Double -> Double -> IO ()
-mouseScrollCallback scrolledTVar = \xOffset yOffset -> atomically $ modifyTVar' scrolledTVar (+yOffset)
+mouseScrollCallback scrolledTVar = \_xOffset yOffset -> atomically $ modifyTVar' scrolledTVar (+yOffset)
         
 data InputTVars = MkInputTVars { scrollTVar :: TVar Double
                                , strTVar    :: TVar String

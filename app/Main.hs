@@ -6,18 +6,16 @@ import qualified "GPipe-GLFW4" Graphics.GPipe.Context.GLFW as GLFW
 import                         Control.Monad                        (unless)
 import                         Control.Monad.IO.Class               (MonadIO(..), liftIO)
 import                         Control.Concurrent.STM
-import qualified               Data.Sequence               as Seq   (empty)
-import                         Data.Sequence                        (Seq(..))
-import                         Text.Printf                          (printf)
 --
 import                         Constants
 import                         Texture
-import                         Shading
-import                         Projection                           (projectToBoard, relativePos)
 import                         Input
 import                         States
 import                         Events
 import                         Text
+import                         RenderBoard                          (initBoardRenderer)
+import                         RenderGUI                            (initGUIRenderer)
+
 
 main :: IO ()
 main =
@@ -26,14 +24,10 @@ main =
         (GLFW.WindowConfig displayWidth displayHeight "The Negotiation Game" Nothing [GLFW.WindowHint'Resizable False] Nothing)
     
     mapTexture <- importTexture mapPath mapHeight mapWidth
-    (vertexBuffer, quadBuffer, rectBuffer, textQuadBuffer, charBuffer, positionBuffer) <- initializeBuffers
-    let initialPosition = V3 (mapQuadWidth/2) (mapQuadHeight/2) initialZoom
-    writeBuffer positionBuffer 0 [initialPosition]
     
     freetype <- liftIO $ textInit
     defaultFont <- loadFont freetype defaultFontFile (V2 mapWidth mapHeight) 
     maybeDefaultFont' <- loadCharacters defaultFont ("#.,()!" ++ ['0'..'9'] ++ ['A'..'Z'] ++ "?" ++ ['А'..'Я'] ++ ['a'..'z'] ++ ['а'..'я'] ++ " +-_=:;")
-
     let defaultFont' = case maybeDefaultFont' of
                         Just font -> font
                         Nothing   -> error "FONT ERROR!!!"
@@ -41,6 +35,8 @@ main =
                         Right octothorp -> octothorp
                         Left _          -> error "# NOT LOADED SUCCESSFULLY"
     let atlas = atlasTexture defaultFont'
+    
+    let cleanupCallback = cleanup freetype
     
     isStrTVar'   :: TVar Bool       <- liftIO $ atomically $ newTVar (False :: Bool)
     strTVar'    :: TVar String      <- liftIO $ atomically $ newTVar ([] :: String)
@@ -52,123 +48,67 @@ main =
     GLFW.setScrollCallback win $ Just $ mouseScrollCallback scrollTVar'
     GLFW.setCharCallback win $ Just $ keyboardCallback strTVar' isStrTVar'
     
-    shadeBoard <- compileShader $ boardShader win positionBuffer mapTexture
-    shadeText  <- compileShader $ textShader win atlas
+    let initialPosition = V3 (mapQuadWidth/2) (mapQuadHeight/2) initialZoom
+    (preRenderBoard, renderBoard) <- initBoardRenderer initialPosition win mapTexture
+    (preRenderGUI, renderGUI) <- initGUIRenderer win atlas
     
     let mapState = MkMapState { position = initialPosition
                               , cursor   = Just (V4 0 0 0 1)
                               , mapMode  = RawMapMode
                               }
                               
-    
-    
-    gameLoop vertexBuffer positionBuffer quadBuffer rectBuffer textQuadBuffer charBuffer 
-             shadeBoard shadeText win
+    gameLoop renderBoard preRenderBoard
+             renderGUI preRenderGUI
+             win
              mapState 
              inputTVars 
-             freetype defaultFont' defaultChar
-
-initializeBuffers :: (ContextHandler ctx, MonadIO m) => ContextT ctx os m 
-                 (Buffer os (B4 Float, B2 Float), 
-                  Buffer os (B4 Float), 
-                  Buffer os (B3 Float, B4 Float), 
-                  Buffer os (B4 Float),
-                  Buffer os (B3 Float, B2 Float, B4 Float),
-                  Buffer os (Uniform (B3 Float)))
-initializeBuffers = do
-    vertexBuffer :: Buffer os (B4 Float, B2 Float) <- newBuffer 4
-    writeBuffer vertexBuffer 0 [ (V4 0            0 0             1, V2 0 0)
-                               , (V4 mapQuadWidth 0 0             1, V2 1 0)
-                               , (V4 0            0 mapQuadHeight 1, V2 0 1)
-                               , (V4 mapQuadWidth 0 mapQuadHeight 1, V2 1 1)
-                               ]
-                               
-    quadBuffer :: Buffer os (B4 Float) <- newBuffer 4   -- a quad that will then be rotated, scaled, translated,
-    writeBuffer quadBuffer 0 ([ V4 (-0.1) 0   0.1   1   -- and colored for debug purposes
-                              , V4   0.1  0   0.1   1
-                              , V4 (-0.1) 0 (-0.1)  1
-                              , V4   0.1  0 (-0.1)  1
-                              ] :: [V4 Float])
-                             
-    rectBuffer :: Buffer os (B3 Float, B4 Float) <- newBuffer 800 -- position + color
-    writeBuffer rectBuffer 0 $ repeat (V3 0 0 0, V4 0 0 0 0)
-    
-    textQuadBuffer :: Buffer os (B4 Float) <- newBuffer 4
-    writeBuffer textQuadBuffer 0 [ V4 0 1 0 1
-                                 , V4 1 1 0 1
-                                 , V4 0 0 0 1
-                                 , V4 1 0 0 1
-                                 ]
-    
-    charBuffer :: Buffer os (B3 Float, B2 Float, B4 Float) <- newBuffer 800 -- 3D-position + sprite size + atlas offset + atlas chunk size
-    writeBuffer charBuffer 0 $ repeat (V3 0 0 0, V2 0 0, V4 0 0 0 0)
-    
-    positionBuffer :: Buffer os (Uniform (B3 Float)) <- newBuffer 1 -- Looking-at 2D-position + Zoom level
-    writeBuffer positionBuffer 0 [0]
-    
-    pure (vertexBuffer, quadBuffer, rectBuffer, textQuadBuffer, charBuffer, positionBuffer) 
+             defaultFont' defaultChar
+             cleanupCallback
 
 
-gameLoop vertexBuffer positionBuffer quadBuffer pointBuffer textQuadBuffer charBuffer
-         shadeBoard shadeText win
+gameLoop renderBoard preRenderBoard
+         renderGUI preRenderGUI
+         win
          mapState 
          inputTVars 
-         freetype defaultFont defaultChar = do
+         defaultFont defaultChar
+         cleanupCallback = do
     -- Collect input --
     input <- collectInput win inputTVars
 
     -- Process events arising from input --
     let (mapState', debugIO) = processEvents mapState input
-    
-    -- Move the data to the GPU buffers --
-    let cursorPointer = case cursor mapState' of
-                            Just cur -> normalizePoint cur
-                            Nothing  -> V3 0 0 0
     _ <- liftIO $ debugIO
     
-    writeBuffer positionBuffer 0 [position mapState']
-    let unpackPosition (V3 x z _) = V3 x 0 z
-    writeBuffer pointBuffer 0 [(unpackPosition . position $ mapState', (V4 1 0 0 1 :: V4 Float)), (cursorPointer, V4 0 1 0 1)]
+    let cursorPointer = case cursor mapState of
+                                Just cur -> normalizePoint cur
+                                Nothing  -> V3 0 0 0
     
-    let
-        cur2DText = case cursorPosition input of
-                V2 x y -> "2D Cursor: " ++ printf "%.2f, %.2f" x y
-        cur3DText = case cursorPointer of
-                V3 x y z -> "3D Cursor: " ++ printf "%.2f, %.2f, %2f" x y z
-        textLength = length cur2DText + length cur3DText
-        cur2DTextSprites = makeTextSprites defaultFont (relativePos 5 80) (fromIntegral displayWidth) (fromIntegral displayHeight) defaultChar cur2DText
-        cur3DTextSprites = makeTextSprites defaultFont (relativePos 5 160) (fromIntegral displayWidth) (fromIntegral displayHeight) defaultChar cur3DText
-    writeBuffer charBuffer 0 $ cur2DTextSprites ++ cur3DTextSprites
+    preRenderBoard mapState'
+    textLength <- preRenderGUI (cursorPosition input) cursorPointer defaultFont defaultChar
         
     -- Render the state --
     render $ do
         clearWindowColor win (V4 1 1 1 1)
-        vertexArray <- newVertexArray vertexBuffer
-        pointArray <- takeVertices 2 <$> newVertexArray pointBuffer
-        quadArray <- newVertexArray quadBuffer
-        let primitiveArray = toPrimitiveArray TriangleStrip vertexArray
-        let pointPrimitives = toPrimitiveArrayInstanced TriangleStrip (\vertex (offset, color) -> (offset, vertex, color)) quadArray pointArray
-        shadeBoard (primitiveArray, pointPrimitives)
-        
-        textQuadArray <- newVertexArray textQuadBuffer
-        charArray <- takeVertices textLength <$> newVertexArray charBuffer
-        let charPrimitives = toPrimitiveArrayInstanced TriangleStrip (\vertex (pos, size, atlasPos) -> (pos, vertex, size, atlasPos)) textQuadArray charArray
-        shadeText charPrimitives
+        renderBoard
+        renderGUI textLength
   
     swapWindowBuffers win
     
     -- Do another iteration --
     closeRequested <- GLFW.windowShouldClose win
     if (closeRequested == Just True) -- I hope this strange way to do cleanup helps GHC to optimize the recursion into a loop
-        then cleanup freetype defaultFont
+        then cleanupCallback defaultFont
         else pure ()
         
     unless (closeRequested == Just True) $ 
-        gameLoop vertexBuffer positionBuffer quadBuffer pointBuffer textQuadBuffer charBuffer
-                 shadeBoard shadeText win
+        gameLoop renderBoard preRenderBoard
+                 renderGUI preRenderGUI
+                 win
                  mapState' 
                  inputTVars 
-                 freetype defaultFont defaultChar  
+                 defaultFont defaultChar
+                 cleanupCallback
                  
 cleanup freetype defaultFont = do
                                 unloadFont defaultFont
