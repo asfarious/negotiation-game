@@ -83,12 +83,12 @@ initializeBuffers = do
                                , (V4 mapQuadWidth 0 mapQuadHeight 1, V2 1 1)
                                ]
                                
-    quadBuffer :: Buffer os (B4 Float) <- newBuffer 4       -- a quad that will then be rotated, scaled, translated,
-    writeBuffer quadBuffer 0 ([ V4   0.1  0 (-0.1) 1        -- and colored for debug purposes
-                             ,  V4   0.1  0  0.1   1
-                             ,  V4 (-0.1) 0 (-0.1) 1
-                             ,  V4 (-0.1) 0  0.1   1
-                             ] :: [V4 Float])
+    quadBuffer :: Buffer os (B4 Float) <- newBuffer 4   -- a quad that will then be rotated, scaled, translated,
+    writeBuffer quadBuffer 0 ([ V4 (-0.1) 0   0.1   1   -- and colored for debug purposes
+                              , V4   0.1  0   0.1   1
+                              , V4 (-0.1) 0 (-0.1)  1
+                              , V4   0.1  0 (-0.1)  1
+                              ] :: [V4 Float])
                              
     rectBuffer :: Buffer os (B3 Float, B4 Float) <- newBuffer 800 -- position + color
     writeBuffer rectBuffer 0 $ repeat (V3 0 0 0, V4 0 0 0 0)
