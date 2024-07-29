@@ -18,27 +18,34 @@ collectInput win inputTVars = do
                             Just (x, y) -> V2 (realToFrac x * 2 / fromIntegral displayWidth - 1) (1 - realToFrac y * 2 / fromIntegral displayHeight)
                             Nothing     -> V2 0 0
     
-    keyInput <- pollKeys win
+    keyInput :: [GLFW.Key] <- pollWith isKeyPressed win allPossible
+    mouseInput :: [GLFW.MouseButton] <- pollWith isMBPressed win allPossible
     toScroll <- liftIO $ atomically $ do
         scrolled <- readTVar $ scrollTVar inputTVars
         writeTVar (scrollTVar inputTVars) (0 :: Double)
         pure scrolled
         
     pure $ MkInput { keyboardInput = Right keyInput
+                   , mouseButtonInput = mouseInput
                    , scrollInput = toScroll
                    , cursorPosition = cursorInput
                    }
 
-allKeys :: [GLFW.Key]
-allKeys = enumFrom (succ minBound)
+allPossible :: (Enum a, Bounded a) => [a]
+allPossible = enumFrom (succ minBound)
 
-pollKeys :: (MonadIO m) => Window os c ds -> ContextT GLFW.Handle os m [GLFW.Key]
-pollKeys win = filterM (isPressed win) allKeys
+pollWith :: (MonadIO m) => (Window os c ds -> a -> ContextT GLFW.Handle os m Bool) -> Window os c ds -> [a] -> ContextT GLFW.Handle os m [a]
+pollWith isOk win = filterM (isOk win)
 
-isPressed :: (MonadIO m) => Window os c ds -> GLFW.Key -> ContextT GLFW.Handle os m Bool
-isPressed win key = GLFW.getKey win key >>= \status -> case status of
+isKeyPressed :: (MonadIO m) => Window os c ds -> GLFW.Key -> ContextT GLFW.Handle os m Bool
+isKeyPressed win key = GLFW.getKey win key >>= \status -> case status of
         Just GLFW.KeyState'Pressed -> pure True
         _                          -> pure False
+
+isMBPressed :: (MonadIO m) => Window os c ds -> GLFW.MouseButton -> ContextT GLFW.Handle os m Bool
+isMBPressed win button = GLFW.getMouseButton win button >>= \status -> case status of
+        Just GLFW.MouseButtonState'Pressed -> pure True
+        _                                  -> pure False
 
 keyboardCallback :: TVar String -> TVar Bool -> Char -> IO ()
 keyboardCallback textTVar isTextTVar = 
@@ -56,7 +63,8 @@ data InputTVars = MkInputTVars { scrollTVar :: TVar Double
                                , isStrTVar  :: TVar Bool
                                }
                                
-data Input = MkInput { keyboardInput  :: Either String [GLFW.Key]
-                     , scrollInput    :: Double
-                     , cursorPosition :: V2 Float
+data Input = MkInput { keyboardInput    :: Either String [GLFW.Key]
+                     , mouseButtonInput :: [GLFW.MouseButton]
+                     , scrollInput      :: Double
+                     , cursorPosition   :: V2 Float
                      }
