@@ -23,4 +23,4 @@ projectCursor at zoom (V2 x y) = projectToBoard at zoom (V4 x y (-1) 1)
 
 -- convert 2D pixel positions into relative viewport coordinates
 relativePos :: Float -> Float -> V3 Float
-relativePos x y = V3 (x / fromIntegral displayWidth - 1) (1 - y / fromIntegral displayHeight) 0 
+relativePos x y = V3 (2 * x / fromIntegral displayWidth - 1) (1 - 2 * y / fromIntegral displayHeight) 0 
