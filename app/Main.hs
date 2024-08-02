@@ -14,7 +14,10 @@ import                         States
 import                         Events
 import                         Text
 import                         RenderBoard                          (initBoardRenderer)
-import                         RenderGUI                            (initGUIRenderer)
+import                         GUI.RenderGUI                        (initGUIRenderer)
+import                         GUI.GUIState
+import                         GUI.UpdateGUI
+import                         GUI.GUIElements
 
 
 main :: IO ()
@@ -56,11 +59,12 @@ main =
                               , cursor   = Just (V4 0 0 0 1)
                               , mapMode  = RawMapMode
                               }
+        guiState = applyEvent (CreateElement cursorStatusPreElement) blankGUIState 
                               
     gameLoop renderBoard preRenderBoard
              renderGUI preRenderGUI
              win
-             mapState 
+             mapState guiState
              inputTVars 
              defaultFont' defaultChar
              cleanupCallback
@@ -69,29 +73,27 @@ main =
 gameLoop renderBoard preRenderBoard
          renderGUI preRenderGUI
          win
-         mapState 
+         mapState guiState
          inputTVars 
          defaultFont defaultChar
          cleanupCallback = do
     -- Collect input --
-    input <- collectInput win inputTVars
-
+    input <- collectInput win inputTVars (flip isInsideGUI $ guiState)
+    
     -- Process events arising from input --
     let (mapState', debugIO) = processEvents mapState input
     _ <- liftIO $ debugIO
     
-    let cursorPointer = case cursor mapState of
-                                Just cur -> normalizePoint cur
-                                Nothing  -> V3 0 0 0
+    let cursorPointer = fmap normalizePoint $ cursor mapState'
     
     preRenderBoard mapState'
-    textLength <- preRenderGUI (cursorPosition input) cursorPointer defaultFont defaultChar
+    (textLength, boxNumber) <- preRenderGUI (cursorPosition input) cursorPointer defaultFont defaultChar guiState
         
     -- Render the state --
     render $ do
         clearWindowColor win (V4 1 1 1 1)
         renderBoard
-        renderGUI textLength
+        renderGUI textLength boxNumber
   
     swapWindowBuffers win
     
@@ -105,7 +107,7 @@ gameLoop renderBoard preRenderBoard
         gameLoop renderBoard preRenderBoard
                  renderGUI preRenderGUI
                  win
-                 mapState' 
+                 mapState' guiState
                  inputTVars 
                  defaultFont defaultChar
                  cleanupCallback

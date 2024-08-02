@@ -25,6 +25,7 @@ dependencies:
 - hashable
 - containers
 - unordered-containers
+- insert-ordered-containers
 - GPipe-Core
 - GPipe-GLFW4
 - lens

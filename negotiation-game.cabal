@@ -27,10 +27,13 @@ library
   exposed-modules:
       Constants
       Events
+      GUI.GUIElements
+      GUI.GUIState
+      GUI.RenderGUI
+      GUI.UpdateGUI
       Input
       Projection
       RenderBoard
-      RenderGUI
       Shading
       States
       Text
@@ -51,6 +54,7 @@ library
     , extra
     , freetype2
     , hashable
+    , insert-ordered-containers
     , lens
     , stm
     , unordered-containers
@@ -74,6 +78,7 @@ executable negotiation-game-exe
     , extra
     , freetype2
     , hashable
+    , insert-ordered-containers
     , lens
     , negotiation-game
     , stm
@@ -99,6 +104,7 @@ test-suite negotiation-game-test
     , extra
     , freetype2
     , hashable
+    , insert-ordered-containers
     , lens
     , negotiation-game
     , stm

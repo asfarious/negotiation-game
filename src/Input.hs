@@ -13,13 +13,15 @@ import                         Control.Monad.IO.Class               (MonadIO(..)
 import                         Control.Concurrent.STM
 
 import                         Constants
+import                         Projection                           (relativePos)
 
-collectInput :: (MonadIO m) => Window os c ds -> InputTVars -> ContextT GLFW.Handle os m Input
-collectInput win inputTVars = do
+collectInput :: (MonadIO m) => Window os c ds -> InputTVars -> (V2 Int -> Bool) -> ContextT GLFW.Handle os m Input
+collectInput win inputTVars cursorCondition = do
     maybeCur <- GLFW.getCursorPos win
     let cursorInput = case maybeCur of
-                            Just (x, y) -> V2 (realToFrac x * 2 / fromIntegral displayWidth - 1) (1 - realToFrac y * 2 / fromIntegral displayHeight)
+                            Just (x, y) -> V2 x y
                             Nothing     -> V2 0 0
+        resolvedCursor = resolveCursor cursorInput cursorCondition
     
     keyInput :: [GLFW.Key] <- pollWith isKeyPressed win allKeys
     mouseInput :: [GLFW.MouseButton] <- pollWith isMBPressed win allPossible
@@ -31,8 +33,14 @@ collectInput win inputTVars = do
     pure $ MkInput { keyboardInput = Right keyInput
                    , mouseButtonInput = mouseInput
                    , scrollInput = toScroll
-                   , cursorPosition = cursorInput
+                   , cursorPosition = resolvedCursor
                    }
+
+resolveCursor :: (V2 Double) -> (V2 Int -> Bool) -> Either (V2 Int) (V2 Float)        
+resolveCursor cursor@(V2 x y) condition = let roundedCursor = fmap round cursor 
+                                 in if condition roundedCursor 
+                                    then Left roundedCursor
+                                    else Right . fmap realToFrac $ (\(V3 x y z) -> V2 x y) $ relativePos x y
 
 allPossible :: (Enum a, Bounded a) => [a]
 allPossible = enumFrom minBound
@@ -72,5 +80,5 @@ data InputTVars = MkInputTVars { scrollTVar :: TVar Double
 data Input = MkInput { keyboardInput    :: Either String [GLFW.Key]
                      , mouseButtonInput :: [GLFW.MouseButton]
                      , scrollInput      :: Double
-                     , cursorPosition   :: V2 Float
+                     , cursorPosition   :: Either (V2 Int) (V2 Float)
                      }
