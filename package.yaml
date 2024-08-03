@@ -26,6 +26,7 @@ dependencies:
 - containers
 - unordered-containers
 - insert-ordered-containers
+- transformers
 - GPipe-Core
 - GPipe-GLFW4
 - lens

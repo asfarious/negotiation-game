@@ -30,6 +30,7 @@ library
       Board.UpdateMap
       Constants
       Events
+      GUI.DescribeGUI
       GUI.GUIElements
       GUI.GUIState
       GUI.RenderGUI
@@ -58,6 +59,7 @@ library
     , insert-ordered-containers
     , lens
     , stm
+    , transformers
     , unordered-containers
   default-language: Haskell2010
 
@@ -83,6 +85,7 @@ executable negotiation-game-exe
     , lens
     , negotiation-game
     , stm
+    , transformers
     , unordered-containers
   default-language: Haskell2010
 
@@ -109,5 +112,6 @@ test-suite negotiation-game-test
     , lens
     , negotiation-game
     , stm
+    , transformers
     , unordered-containers
   default-language: Haskell2010
