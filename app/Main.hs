@@ -5,7 +5,6 @@ import                         Graphics.GPipe
 import qualified "GPipe-GLFW4" Graphics.GPipe.Context.GLFW as GLFW
 import                         Control.Monad                        (unless)
 import                         Control.Monad.IO.Class               (MonadIO(..), liftIO)
-import                         Control.Concurrent.STM
 --
 import                         Constants
 import                         Texture
@@ -14,10 +13,10 @@ import                         Events
 import                         Text
 import                         Board.RenderBoard                    (initBoardRenderer)
 import                         Board.MapState                       
-import                         Board.UpdateMap
+import                         Board.UpdateMap                      () -- instances
 import                         GUI.RenderGUI                        (initGUIRenderer)
 import                         GUI.GUIState
-import                         GUI.UpdateGUI
+import                         GUI.UpdateGUI                        () -- instances
 import                         GUI.GUIElements
 
 
