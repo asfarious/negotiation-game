@@ -9,7 +9,9 @@ import                         Events
 
 cursorStatusPreElement :: PreGUIElement Event
 cursorStatusPreElement = ( V4 0 0 555 90
-                         , (\_ _ -> [])
+                         , \_ click -> case click of
+                                            GUIRightClick _-> []
+                                            GUILeftClick at -> [Event'GUIEvent $ CreateElement (clickWindowPreElement at)]
                          , \bBox@(V4 bbX bbY _ _) (cur2D, cur3D) 
                               -> let cur2DText = case cur2D of
                                                       Left (V2 x y)  -> "2D Cursor: " ++ printf "%d, %d" x y
@@ -22,3 +24,14 @@ cursorStatusPreElement = ( V4 0 0 555 90
                                     , TextBox (V4 (bbX+5) (bbY+80) 1 1) cur3DText
                                     ]
                          )
+
+clickWindowPreElement :: V2 Int -> PreGUIElement Event
+clickWindowPreElement (V2 x y) = ( V4 0 200 555 50
+                                 , \self click -> case click of
+                                                    GUILeftClick _  -> []
+                                                    GUIRightClick _ -> [Event'GUIEvent $ DeleteElement self]
+                                 , \bBox@(V4 bbX bbY _ _) _ ->
+                                    [ ColoredBox bBox (V4 1 1 0 1)
+                                    , TextBox (V4 (bbX+5) (bbY+40) 1 1) $ printf "Clicked at: %d, %d" x y
+                                    ]
+                                 )

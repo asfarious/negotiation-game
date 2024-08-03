@@ -7,10 +7,10 @@ import                         Text.Printf                          (printf)
 
 import                         Constants
 import                         Shading
-import                         States
 import                         Text
 import                         Projection                           (relativePos)
 import                         GUI.GUIState
+import                         Events                               (Event)
 
 initGUIRenderer win atlas = do
         textQuadBuffer :: Buffer os (B4 Float) <- newBuffer 4
@@ -39,7 +39,7 @@ guiPreRenderer :: (ContextHandler ctx, MonadIO m)
                ->  Maybe (V3 Float)
                ->  FontAtlas os
                ->  DisplayChar
-               ->  GUIState event
+               ->  GUIState Event
                ->  ContextT ctx os m (Int, Int) 
                
 guiPreRenderer charBuffer coloredBoxBuffer cur2D cur3D font defaultChar (MkGUIState (_, guiElements)) = do

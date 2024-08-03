@@ -25,6 +25,9 @@ source-repository head
 
 library
   exposed-modules:
+      Board.MapState
+      Board.RenderBoard
+      Board.UpdateMap
       Constants
       Events
       GUI.GUIElements
@@ -33,9 +36,7 @@ library
       GUI.UpdateGUI
       Input
       Projection
-      RenderBoard
       Shading
-      States
       Text
       Texture
   other-modules:

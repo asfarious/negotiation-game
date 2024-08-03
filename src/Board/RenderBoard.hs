@@ -1,12 +1,12 @@
 {-# LANGUAGE ScopedTypeVariables, PackageImports, TypeFamilies #-}   
-module RenderBoard (initBoardRenderer) where
+module Board.RenderBoard (initBoardRenderer) where
 
 import                         Graphics.GPipe
 import                         Control.Monad.IO.Class               (MonadIO(..))
 
 import                         Constants
 import                         Shading
-import                         States
+import                         Board.MapState
 
 initBoardRenderer initialPosition win mapTexture = do
         vertexBuffer :: Buffer os (B4 Float, B2 Float) <- newBuffer 4

@@ -10,10 +10,11 @@ import                         Control.Concurrent.STM
 import                         Constants
 import                         Texture
 import                         Input
-import                         States
 import                         Events
 import                         Text
-import                         RenderBoard                          (initBoardRenderer)
+import                         Board.RenderBoard                    (initBoardRenderer)
+import                         Board.MapState                       
+import                         Board.UpdateMap
 import                         GUI.RenderGUI                        (initGUIRenderer)
 import                         GUI.GUIState
 import                         GUI.UpdateGUI
@@ -41,15 +42,7 @@ main =
     
     let cleanupCallback = cleanup freetype
     
-    isStrTVar'   :: TVar Bool       <- liftIO $ atomically $ newTVar (False :: Bool)
-    strTVar'    :: TVar String      <- liftIO $ atomically $ newTVar ([] :: String)
-    scrollTVar' :: TVar Double      <- liftIO $ atomically $ newTVar (0 :: Double)
-    let inputTVars = MkInputTVars { scrollTVar = scrollTVar'
-                                  , strTVar    = strTVar'
-                                  , isStrTVar  = isStrTVar'
-                                  }
-    GLFW.setScrollCallback win $ Just $ mouseScrollCallback scrollTVar'
-    GLFW.setCharCallback win $ Just $ keyboardCallback strTVar' isStrTVar'
+    inputTVars <- initInput win
     
     let initialPosition = V3 (mapQuadWidth/2) (mapQuadHeight/2) initialZoom
     (preRenderBoard, renderBoard) <- initBoardRenderer initialPosition win mapTexture
@@ -59,12 +52,12 @@ main =
                               , cursor   = Just (V4 0 0 0 1)
                               , mapMode  = RawMapMode
                               }
-        guiState = applyEvent (CreateElement cursorStatusPreElement) blankGUIState 
+        (guiState, _) = applyEvent (CreateElement cursorStatusPreElement) (blankGUIState :: GUIState Event) 
                               
     gameLoop renderBoard preRenderBoard
              renderGUI preRenderGUI
              win
-             mapState guiState
+             mapState guiState []
              inputTVars 
              defaultFont' defaultChar
              cleanupCallback
@@ -73,7 +66,7 @@ main =
 gameLoop renderBoard preRenderBoard
          renderGUI preRenderGUI
          win
-         mapState guiState
+         mapState (guiState :: GUIState Event) pendingEvents
          inputTVars 
          defaultFont defaultChar
          cleanupCallback = do
@@ -81,13 +74,14 @@ gameLoop renderBoard preRenderBoard
     input <- collectInput win inputTVars (flip isInsideGUI $ guiState)
     
     -- Process events arising from input --
-    let (mapState', debugIO) = processEvents mapState input
-    _ <- liftIO $ debugIO
+    let (guiEvents, mapEvents) = splitEvents . (pendingEvents ++) . processEvents mapState $ input
+    let (guiState', pendingGUIEvents) = update guiState guiEvents
+    let (mapState', pendingMapEvents) = update mapState mapEvents
     
     let cursorPointer = fmap normalizePoint $ cursor mapState'
     
     preRenderBoard mapState'
-    (textLength, boxNumber) <- preRenderGUI (cursorPosition input) cursorPointer defaultFont defaultChar guiState
+    (textLength, boxNumber) <- preRenderGUI (cursorPosition input) cursorPointer defaultFont defaultChar guiState'
         
     -- Render the state --
     render $ do
@@ -107,7 +101,7 @@ gameLoop renderBoard preRenderBoard
         gameLoop renderBoard preRenderBoard
                  renderGUI preRenderGUI
                  win
-                 mapState' guiState
+                 mapState' guiState' (pendingMapEvents ++ pendingGUIEvents)
                  inputTVars 
                  defaultFont defaultChar
                  cleanupCallback
