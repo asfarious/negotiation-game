@@ -11,9 +11,11 @@ blankGUIState = MkGUIState (0, IM.empty)
 
 newtype GUIState event = MkGUIState (Int, InsOrdHashMap Int (GUIElement event))
 
-newtype GUIElement event = MkGUIElement (Int, BoundingBox, Int -> GUIClick -> [event], BoundingBox -> (Either (V2 Int) (V2 Float), Maybe (V3 Float)) -> [GUIBox])
+newtype GUIElement event = MkGUIElement (Int, BoundingBox, GUIEventHandler event, GUIRenderHandler)
 
-type PreGUIElement event = (BoundingBox, Int -> GUIClick -> [event], BoundingBox -> (Either (V2 Int) (V2 Float), Maybe (V3 Float)) -> [GUIBox])
+type GUIEventHandler event = Int -> GUIClick -> [event]
+type GUIRenderHandler = BoundingBox -> (Either (V2 Int) (V2 Float), Maybe (V3 Float)) -> [GUIBox]
+type PreGUIElement event = (BoundingBox, GUIEventHandler event, GUIRenderHandler)
 
 getBoundingBox :: GUIElement event -> BoundingBox
 getBoundingBox (MkGUIElement (_, bBox, _, _)) = bBox
