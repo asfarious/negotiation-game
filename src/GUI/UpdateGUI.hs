@@ -17,7 +17,7 @@ instance StateEvent (GUIState Event) (GUIEvent Event) where
                 -> (MkGUIState (nextID + 1, flip (IM.insert nextID) elements $ MkGUIElement (nextID, bBox, eventHandler, renderHandler)), [])
             DeleteElement elementID -> (MkGUIState (nextID, IM.delete elementID elements), [])
             MoveElement elementID displacement -> (MkGUIState (nextID, adjustToTop (move displacement) elementID elements), [])
-            ClickAt click -> case findLast (isInBoundingBox (getCursor click) . getBoundingBox) elements of
+            ClickAtGUI click -> case findLast (isInBoundingBox (getCursor click) . getBoundingBox) elements of
                                 Nothing -> (guistate, [])
                                 Just (MkGUIElement (elementID, V4 x y _ _, eventHandler, _)) -> ( MkGUIState (nextID, adjustToTop id elementID elements)
                                                                                                 , eventHandler elementID $ adjustCursor (subtract $ V2 x y) click

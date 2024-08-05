@@ -63,13 +63,17 @@ normDPos (V3 x y s) = V3 x' y' s
 
 processMouseOnMap :: V4 Float -> [GLFW.MouseButton] -> CreateEvents ()
 processMouseOnMap cursor = traverse_ $ \button -> do
-        pure ()
+        let normalizedCursor = normalizePoint cursor
+        case button of
+            GLFW.MouseButton'1 -> tellP . Event'MapEvent . ClickAtMap . MapLeftClick  $ normalizedCursor
+            GLFW.MouseButton'2 -> tellP . Event'MapEvent . ClickAtMap . MapRightClick $ normalizedCursor
+            _                  -> pure ()
 
 processMouseOnGUI :: V2 Int -> [GLFW.MouseButton] -> CreateEvents ()
 processMouseOnGUI cursor = traverse_ $ \button -> do
         case button of
-            GLFW.MouseButton'1 -> tellP . Event'GUIEvent . ClickAt . GUILeftClick  $ cursor
-            GLFW.MouseButton'2 -> tellP . Event'GUIEvent . ClickAt . GUIRightClick $ cursor
+            GLFW.MouseButton'1 -> tellP . Event'GUIEvent . ClickAtGUI . GUILeftClick  $ cursor
+            GLFW.MouseButton'2 -> tellP . Event'GUIEvent . ClickAtGUI . GUIRightClick $ cursor
             _                  -> pure ()
 
 class StateEvent s e where

@@ -29,7 +29,7 @@ data GUIBox = ColoredBox BoundingBox (V4 Float)
 data GUIEvent event = CreateElement (PreGUIElement event)
                     | DeleteElement Int
                     | MoveElement Int (V2 Int)
-                    | ClickAt GUIClick
+                    | ClickAtGUI GUIClick
 
 data GUIClick = GUILeftClick (V2 Int)
               | GUIRightClick (V2 Int)
