@@ -11,3 +11,4 @@ instance StateEvent MapState MapEvent where
             MoveCamera newPosition -> (mapState {position = newPosition}, [])
             UpdateMapCursor newCursor -> (mapState {cursor = newCursor}, [])
             UpdateMapMode newMapMode -> (mapState {mapMode = newMapMode}, [])
+            _  -> (mapState, [])
