@@ -19,6 +19,7 @@ cursorStatusPreElement = flip newPreElement (V4 0 0 555 90) $ do
                                                                 onClick $ \_ click -> case click of
                                                                         GUIRightClick _-> []
                                                                         GUILeftClick at -> [Event'GUIEvent $ CreateElement (clickWindowPreElement at)]
+                                                                coloredButton (V4 455 0 100 40) (V4 0 0 1 1) $ \self _ -> [Event'GUIEvent $ DeleteElement self]
 
 clickWindowPreElement (V2 x y) = flip newPreElement (V4 0 200 555 50) $ do
                                                                 coloredBackground (V4 1 1 0 1)

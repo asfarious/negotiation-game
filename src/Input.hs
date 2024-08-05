@@ -27,27 +27,28 @@ collectInput win inputTVars cursorCondition = do
                             Nothing     -> V2 0 0
         resolvedCursor = resolveCursor cursorInput cursorCondition
     
-    keyInput :: [GLFW.Key] <- pollWith isKeyPressed win allKeys
-    (pressedMBs, releasedMBs) <- partitionM (isMBPressed win) allPossible
-    
-    mouseInput <- liftIO $ atomically $ do
-        mouseButtonState <- readTVar $ mouseButtonsTVar inputTVars
-        let mouseButtonState'  = foldr (\x state -> M.adjust (+1) x state) mouseButtonState pressedMBs
-            mouseButtonState'' = foldr (\x state -> M.adjust (const 0) x state) mouseButtonState' releasedMBs
-            justPressedButtons = fmap fst . filter (\(_, n) -> n == 1) . M.toList $ mouseButtonState''
-        writeTVar (mouseButtonsTVar inputTVars) mouseButtonState''
-        pure justPressedButtons
+    (pressedKeys, heldKeys, _) <- pollWith isKeyPressed win (keyButtonsTVar inputTVars) allKeys   
+    (mouseInput, _, _)  <- pollWith isMBPressed win (mouseButtonsTVar inputTVars) allPossible
            
     toScroll <- liftIO $ atomically $ do
         scrolled <- readTVar $ scrollTVar inputTVars
         writeTVar (scrollTVar inputTVars) (0 :: Double)
         pure scrolled
         
-    pure $ MkInput { keyboardInput = Right keyInput
+    pure $ MkInput { keyboardInput = Right (pressedKeys, heldKeys)
                    , mouseButtonInput = mouseInput
                    , scrollInput = toScroll
                    , cursorPosition = resolvedCursor
                    }
+
+justPressed :: (Ord a) => [a] -> [a] -> TVar (Map a Int) -> STM [a]
+justPressed pressed released tvar = do
+        buttonState <- readTVar $ tvar
+        let buttonState'  = foldr (\x state -> M.adjust (+1) x state) buttonState pressed
+            buttonState'' = foldr (\x state -> M.adjust (const 0) x state) buttonState' released
+            justPressedButtons = fmap fst . filter (\(_, n) -> n == 1) . M.toList $ buttonState''
+        writeTVar tvar buttonState''
+        pure justPressedButtons
 
 resolveCursor :: (V2 Double) -> (V2 Int -> Bool) -> Either (V2 Int) (V2 Float)        
 resolveCursor cursor@(V2 x y) condition = let roundedCursor = fmap round cursor 
@@ -55,14 +56,22 @@ resolveCursor cursor@(V2 x y) condition = let roundedCursor = fmap round cursor
                                     then Left roundedCursor
                                     else Right . fmap realToFrac $ (\(V3 x y z) -> V2 x y) $ relativePos x y
 
+pollWith :: (MonadIO m, Ord a) 
+         => (Window os c ds -> a -> ContextT GLFW.Handle os m Bool) 
+         -> Window os c ds 
+         -> TVar (Map a Int)
+         -> [a] 
+         -> ContextT GLFW.Handle os m ([a], [a], [a])
+pollWith isOk win tvar polled = do
+                            (pressed, released) <- partitionM (isOk win) polled
+                            justPressed <- liftIO $ atomically $ justPressed pressed released tvar
+                            pure (justPressed, pressed, released)
+
 allPossible :: (Enum a, Bounded a) => [a]
 allPossible = enumFrom minBound
 
 allKeys :: [GLFW.Key] -- GLFW.Key'Unknown is not an actual key
 allKeys = drop 1 allPossible
-
-pollWith :: (MonadIO m) => (Window os c ds -> a -> ContextT GLFW.Handle os m Bool) -> Window os c ds -> [a] -> ContextT GLFW.Handle os m [a]
-pollWith isOk win = filterM (isOk win)
 
 isKeyPressed :: (MonadIO m) => Window os c ds -> GLFW.Key -> ContextT GLFW.Handle os m Bool
 isKeyPressed win key = GLFW.getKey win key >>= \status -> case status of
@@ -98,20 +107,23 @@ initInputTVars = do
                     strTVar'          :: TVar String                     <- newTVar ([] :: String)
                     scrollTVar'       :: TVar Double                     <- newTVar (0 :: Double)
                     mouseButtonsTVar' :: TVar (Map GLFW.MouseButton Int) <- newTVar $ M.fromList . zip allPossible $ repeat 0
+                    keyButtonsTVar'    :: TVar (Map GLFW.Key Int)         <- newTVar $ M.fromList . zip allKeys $ repeat 0
                     
                     pure MkInputTVars { scrollTVar       = scrollTVar'
                                       , strTVar          = strTVar'
                                       , isStrTVar        = isStrTVar'
                                       , mouseButtonsTVar = mouseButtonsTVar'
+                                      , keyButtonsTVar   = keyButtonsTVar'
                                       }
         
 data InputTVars = MkInputTVars { scrollTVar       :: TVar Double
                                , strTVar          :: TVar String
                                , isStrTVar        :: TVar Bool
                                , mouseButtonsTVar :: TVar (Map GLFW.MouseButton Int)
+                               , keyButtonsTVar   :: TVar (Map GLFW.Key Int)
                                }
                                
-data Input = MkInput { keyboardInput    :: Either String [GLFW.Key]
+data Input = MkInput { keyboardInput    :: Either String ([GLFW.Key], [GLFW.Key])
                      , mouseButtonInput :: [GLFW.MouseButton]
                      , scrollInput      :: Double
                      , cursorPosition   :: Either (V2 Int) (V2 Float)
