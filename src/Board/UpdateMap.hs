@@ -2,6 +2,7 @@
 module Board.UpdateMap where
 
 import                         Graphics.GPipe
+import                         Data.Ix              (inRange)
 --
 import                         Constants
 import                         Board.MapState
@@ -19,7 +20,11 @@ instance StateEvent MapState MapEvent where
                 MapLeftClick (V3 x y z) -> let mapX = round $ x * (mapWidth / mapQuadWidth)
                                                mapY = round $ z * (mapHeight / mapQuadHeight)
                                                colorAt = getColorAt (entityMap mapState) mapX mapY
-                                           in (mapState {selectedProv = Just colorAt}, [Event'GUIEvent $ CreateElement $ provinceWindowPreElement colorAt])
+                                           in case inRange ((0, 0), (mapWidth, mapHeight)) (mapX, mapY) of
+                                                True  -> (  mapState {selectedProv = Just colorAt}
+                                                         , [Event'GUIEvent $ CreateElement $ provinceWindowPreElement colorAt]
+                                                         )
+                                                False -> (mapState, [])
                 MapRightClick _ -> (mapState, [])
             UnselectProvince -> (mapState {selectedProv = Nothing}, [])
             _  -> (mapState, [])
