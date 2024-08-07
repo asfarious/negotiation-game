@@ -7,9 +7,15 @@ import                         Data.Ix                           (inRange)
 import                         Data.Monoid                       (mconcat, Any(..))
 
 blankGUIState :: GUIState event
-blankGUIState = MkGUIState (0, IM.empty)
+blankGUIState = MkGUIState { nextID            = 0
+                           , guiElements       = IM.empty
+                           , misensceneElement = Nothing
+                           }
 
-newtype GUIState event = MkGUIState (Int, InsOrdHashMap Int (GUIElement event))
+data GUIState event = MkGUIState { nextID            :: Int
+                                 , guiElements       :: InsOrdHashMap Int (GUIElement event)
+                                 , misensceneElement :: Maybe Int
+                                 }
 
 newtype GUIElement event = MkGUIElement (Int, BoundingBox, GUIEventHandler event, GUIRenderHandler)
 
@@ -30,6 +36,7 @@ data GUIEvent event = CreateElement (PreGUIElement event)
                     | DeleteElement Int
                     | MoveElement Int (V2 Int)
                     | ClickAtGUI GUIClick
+                    | UpdateMisensceneElement (PreGUIElement event)
 
 data GUIClick = GUILeftClick (V2 Int)
               | GUIRightClick (V2 Int)
@@ -46,4 +53,4 @@ isInBoundingBox :: V2 Int -> BoundingBox -> Bool
 isInBoundingBox (V2 x y) (V4 boxX boxY boxWidth boxHeight) = inRange ((boxX, boxY), (boxX + boxWidth, boxY + boxHeight)) (x, y)
 
 isInsideGUI :: V2 Int -> GUIState event -> Bool
-isInsideGUI pos (MkGUIState (_, elements)) = getAny . IM.unorderedFoldMap (Any . isInBoundingBox pos . getBoundingBox) $ elements
+isInsideGUI pos guiState = getAny . IM.unorderedFoldMap (Any . isInBoundingBox pos . getBoundingBox) $ guiElements guiState

@@ -22,7 +22,7 @@ instance StateEvent MapState MapEvent where
                                                colorAt = getColorAt (entityMap mapState) mapX mapY
                                            in case inRange ((0, 0), (mapWidth, mapHeight)) (mapX, mapY) of
                                                 True  -> (  mapState {selectedProv = Just colorAt}
-                                                         , [Event'GUIEvent $ CreateElement $ provinceWindowPreElement colorAt]
+                                                         , [Event'GUIEvent $ UpdateMisensceneElement $ provinceWindowPreElement colorAt]
                                                          )
                                                 False -> (mapState, [])
                 MapRightClick _ -> (mapState, [])

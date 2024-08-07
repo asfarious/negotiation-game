@@ -12,16 +12,38 @@ import                         Events
 
 
 instance StateEvent (GUIState Event) (GUIEvent Event) where
-    applyEvent guiEvent guistate@(MkGUIState (nextID, elements)) = case guiEvent of
-            CreateElement (bBox, eventHandler, renderHandler) 
-                -> (MkGUIState (nextID + 1, flip (IM.insert nextID) elements $ MkGUIElement (nextID, bBox, eventHandler, renderHandler)), [])
-            DeleteElement elementID -> (MkGUIState (nextID, IM.delete elementID elements), [])
-            MoveElement elementID displacement -> (MkGUIState (nextID, adjustToTop (move displacement) elementID elements), [])
+    applyEvent guiEvent guiState = let elements = guiElements guiState
+        in case guiEvent of
+            CreateElement preGUIElement -> (createElement preGUIElement guiState, [])
+            DeleteElement elementID -> (deleteElement elementID guiState, [])
+            MoveElement elementID displacement -> (guiState {guiElements = adjustToTop (move displacement) elementID elements}, [])
             ClickAtGUI click -> case findLast (isInBoundingBox (getCursor click) . getBoundingBox) elements of
-                                Nothing -> (guistate, [])
-                                Just (MkGUIElement (elementID, V4 x y _ _, eventHandler, _)) -> ( MkGUIState (nextID, adjustToTop id elementID elements)
+                                Nothing -> (guiState, [])
+                                Just (MkGUIElement (elementID, V4 x y _ _, eventHandler, _)) -> ( guiState {guiElements = adjustToTop id elementID elements}
                                                                                                 , eventHandler elementID $ adjustCursor (subtract $ V2 x y) click
                                                                                                 )
+            UpdateMisensceneElement preGUIElement -> let guiState' = case misensceneElement guiState of
+                                                                        Nothing     ->    guiState
+                                                                        Just elementID -> deleteElement elementID guiState
+                                                         newID = nextID guiState'
+                                                         (bBox, eventHandler, renderHandler) = preGUIElement
+                                                      in (guiState' {nextID = newID + 1
+                                                                    , guiElements = flip (IM.insert newID) (guiElements guiState') 
+                                                                        $ MkGUIElement (newID, bBox, eventHandler, renderHandler)
+                                                                    , misensceneElement = Just newID
+                                                                    }
+                                                         , []
+                                                         )
+
+createElement :: PreGUIElement Event -> GUIState Event -> GUIState Event
+createElement (bBox, eventHandler, renderHandler) guiState 
+        = let newID = nextID guiState 
+          in guiState {nextID = newID + 1
+                      , guiElements = flip (IM.insert newID) (guiElements guiState) $ MkGUIElement (newID, bBox, eventHandler, renderHandler)
+                      }
+
+deleteElement :: Int -> GUIState Event -> GUIState Event
+deleteElement elementID guiState = guiState {guiElements = IM.delete elementID $ guiElements guiState}
 
 -- Helper functions --
 adjustToTop :: (Eq k, Hashable k) => (v -> v) -> k -> InsOrdHashMap k v -> InsOrdHashMap k v

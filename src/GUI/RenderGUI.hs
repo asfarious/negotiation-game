@@ -42,8 +42,8 @@ guiPreRenderer :: (ContextHandler ctx, MonadIO m)
                ->  GUIState Event
                ->  ContextT ctx os m (Int, Int) 
                
-guiPreRenderer charBuffer coloredBoxBuffer cur2D cur3D font defaultChar (MkGUIState (_, guiElements)) = do
-        let guiBoxes = concatMap (\(MkGUIElement (_, bBox, _, renderElem)) -> renderElem bBox (cur2D, cur3D)) guiElements
+guiPreRenderer charBuffer coloredBoxBuffer cur2D cur3D font defaultChar guiState = do
+        let guiBoxes = concatMap (\(MkGUIElement (_, bBox, _, renderElem)) -> renderElem bBox (cur2D, cur3D)) $ guiElements guiState
             (coloredBoxes, textBoxes) = splitBoxes guiBoxes
             coloredBoxesScaled = fmap scaleBox coloredBoxes
             textSprites = concatMap (textBoxToSprites font defaultChar) textBoxes
