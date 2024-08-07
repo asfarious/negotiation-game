@@ -9,9 +9,9 @@ import                         Projection                          (viewBoard)
 
 boardShader :: Window os RGBAFloat ds
           -> Buffer os (Uniform (B3 Float))
-          -> Texture2D os (Format RGBAFloat)
+          -> Texture2DArray os (Format RGBAFloat)
           -> Shader os (PrimitiveArray Triangles (B4 Float, B2 Float), PrimitiveArray Triangles (B3 Float, B4 Float, B4 Float)) ()
-boardShader win positionBuffer mapTexture = do
+boardShader win positionBuffer mapTextureArray = do
 
     --Stream initialization --
     primitiveStream <- toPrimitiveStream fst
@@ -25,11 +25,11 @@ boardShader win positionBuffer mapTexture = do
     -- A map teture sampler --
     let filter = SamplerFilter Nearest Nearest Nearest Nothing
         edge = (pure Repeat, undefined)
-    sampler <- newSampler2D $ const (mapTexture, filter, edge)
+    sampler <- newSampler2DArray $ const (mapTextureArray, filter, edge)
     
     -- Texturing the map --
-    let sampleTexture = sample2D sampler SampleAuto Nothing Nothing
-        fragmentStreamTextured = fmap sampleTexture fragmentStream
+    let sampleTexture = sample2DArray sampler SampleAuto Nothing
+        fragmentStreamTextured = fmap (sampleTexture . (\(V2 u v) -> V3 u v 0)) fragmentStream
       
     -- Debug points --
     let primitivePoints2 = fmap (\(offset, vertex, color) -> (viewBoard (V3 x 0 z) s (vector offset + vertex), color)) primitivePoints

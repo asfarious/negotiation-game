@@ -27,6 +27,9 @@ keyScrollSensitivity = 0.3
 mapPath :: FilePath
 mapPath = "data\\map.png"
 
+provinceMapPath :: FilePath
+provinceMapPath = "data\\provinces.png" --
+
 mapHeight :: Num a => a
 mapHeight = 1024
 
