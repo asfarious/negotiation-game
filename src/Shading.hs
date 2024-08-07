@@ -9,14 +9,16 @@ import                         Projection                          (viewBoard)
 
 boardShader :: Window os RGBAFloat ds
           -> Buffer os (Uniform (B3 Float))
+          -> Buffer os (Uniform (B4 Float))
           -> Texture2DArray os (Format RGBAFloat)
           -> Shader os (PrimitiveArray Triangles (B4 Float, B2 Float), PrimitiveArray Triangles (B3 Float, B4 Float, B4 Float)) ()
-boardShader win positionBuffer mapTextureArray = do
+boardShader win positionBuffer selectedProvBuffer mapTextureArray = do
 
     --Stream initialization --
     primitiveStream <- toPrimitiveStream fst
     primitivePoints <- toPrimitiveStream snd
-    (V3 x z s) <- getUniform $ const (positionBuffer, 0)
+    (V3 x z s)      <- getUniform $ const (positionBuffer, 0)
+    selectedColor   <- getUniform $ const (selectedProvBuffer, 0)
     
     --Rasterizing the map --
     let primitiveStream2 = fmap (\(point, texPos) -> (viewBoard (V3 x 0 z) s point, texPos)) primitiveStream
@@ -29,16 +31,20 @@ boardShader win positionBuffer mapTextureArray = do
     
     -- Texturing the map --
     let sampleTexture = sample2DArray sampler SampleAuto Nothing
-        fragmentStreamTextured = fmap (sampleTexture . (\(V2 u v) -> V3 u v 0)) fragmentStream
-      
+        fragmentStreamTextured  = fmap (sampleTexture . (\(V2 u v) -> V3 u v 0)) fragmentStream
+        fragmentStreamProvinces = fmap (sampleTexture . (\(V2 u v) -> V3 u v 1)) fragmentStream
+        fragmentStreamHighlight = fmap 
+            (\color -> ifThenElse' (color ==* selectedColor) (V4 1 1 1 0.3) (V4 0 0 0 0)) fragmentStreamProvinces
+        
     -- Debug points --
     let primitivePoints2 = fmap (\(offset, vertex, color) -> (viewBoard (V3 x 0 z) s (vector offset + vertex), color)) primitivePoints
     fragmentStreamPoints <- rasterize (const (FrontAndBack, PolygonFill, ViewPort (V2 0 0) (V2 displayWidth displayHeight), DepthRange 0 1)) primitivePoints2
         
     -- Actually drawing --
+    let blending = BlendRgbAlpha (FuncAdd, FuncAdd) (BlendingFactors SrcAlpha OneMinusSrcAlpha, BlendingFactors One Zero) (V4 0 0 0 0)
     drawWindowColor (const (win, ContextColorOption NoBlending (V4 True True True True))) fragmentStreamTextured
+    drawWindowColor (const (win, ContextColorOption blending (V4 True True True True))) fragmentStreamHighlight
     drawWindowColor (const (win, ContextColorOption NoBlending (V4 True True True True))) fragmentStreamPoints
-
 
 textShader :: Window os RGBAFloat ds
            -> Texture2D os (Format RFloat)

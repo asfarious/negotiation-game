@@ -4,6 +4,7 @@ import                         Graphics.GPipe
 import                         Text.Printf                          (printf)
 --
 import                         GUI.GUIState
+import                         Board.MapState                       (MapEvent(..))
 import                         Events
 import                         GUI.DescribeGUI
 
@@ -27,3 +28,10 @@ clickWindowPreElement (V2 x y) = flip newPreElement (V4 0 200 555 50) $ do
                                                                 onClick $ \self click -> case click of
                                                                         GUILeftClick _  -> []
                                                                         GUIRightClick _ -> [Event'GUIEvent $ DeleteElement self]
+
+provinceWindowPreElement (V4 r g b a) = flip newPreElement (V4 925 100 300 400) $ do
+                                                                coloredBackground (V4 (255/255) (233/255) (127/255) 1)
+                                                                textBox (V4 5 80 2 2) $ \_ -> printf "Province of %.2f %.2f %.2f %.2f" r g b a 
+                                                                coloredButton (V4 200 0 100 40) (V4 0 0 1 1) $ \self _ -> [ Event'GUIEvent $ DeleteElement self
+                                                                                                                          , Event'MapEvent $ UnselectProvince
+                                                                                                                          ]

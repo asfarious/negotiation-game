@@ -29,18 +29,22 @@ initBoardRenderer initialPosition win mapTexture = do
         positionBuffer :: Buffer os (Uniform (B3 Float)) <- newBuffer 1 -- Looking-at 2D-position + Zoom level
         writeBuffer positionBuffer 0 [initialPosition]
         
-        shadeBoard <- compileShader $ boardShader win positionBuffer mapTexture
+        selectedProvBuffer :: Buffer os (Uniform (B4 Float)) <- newBuffer 1 -- the province to highlight
+        writeBuffer selectedProvBuffer 0 [V4 0 0 0 0]
         
-        pure (boardPreRenderer pointBuffer positionBuffer, boardRenderer vertexBuffer quadBuffer pointBuffer shadeBoard)
+        shadeBoard <- compileShader $ boardShader win positionBuffer selectedProvBuffer mapTexture
+        
+        pure (boardPreRenderer pointBuffer positionBuffer selectedProvBuffer, boardRenderer vertexBuffer quadBuffer pointBuffer shadeBoard)
 
 
 boardPreRenderer :: (ContextHandler ctx, MonadIO m) 
                  =>  Buffer os (B3 Float, B4 Float)
                  ->  Buffer os (Uniform (B3 Float))
+                 ->  Buffer os (Uniform (B4 Float))
                  ->  MapState 
                  ->  ContextT ctx os m () 
                  
-boardPreRenderer pointBuffer positionBuffer mapState = do
+boardPreRenderer pointBuffer positionBuffer selectedProvBuffer mapState = do
         -- Move the data to the GPU buffers --
         let cursorPointer = case cursor mapState of
                                 Just cur -> normalizePoint cur
@@ -49,7 +53,9 @@ boardPreRenderer pointBuffer positionBuffer mapState = do
         writeBuffer positionBuffer 0 [position mapState]
         let unpackPosition (V3 x z _) = V3 x 0 z
         writeBuffer pointBuffer 0 [(unpackPosition . position $ mapState, (V4 1 0 0 1 :: V4 Float)), (cursorPointer, V4 0 1 0 1)]
-
+        case selectedProv mapState of 
+            Nothing            -> writeBuffer selectedProvBuffer 0 [V4 0 0 0 0]
+            Just selectedColor -> writeBuffer selectedProvBuffer 0 [selectedColor]
 
 boardRenderer :: Buffer os (B4 Float, B2 Float) 
               -> Buffer os (B4 Float)
