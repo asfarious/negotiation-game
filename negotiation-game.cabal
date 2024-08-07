@@ -36,6 +36,7 @@ library
       GUI.RenderGUI
       GUI.UpdateGUI
       Input
+      ProcessEvents
       Projection
       Shading
       Text
