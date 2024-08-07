@@ -2,6 +2,7 @@
 
 module Texture ( importTexture
                , importTextureFromList
+               , importTextureArray
                , fromImage
                , getImage
                , getColorAt
@@ -12,6 +13,20 @@ import qualified "GPipe-GLFW4" Graphics.GPipe.Context.GLFW       as GLFW
 import qualified               Codec.Picture as JP
 import                         Data.Word                                 (Word8)
 import                         Control.Monad.IO.Class                    (MonadIO, liftIO)
+
+
+importTextureArray :: (MonadIO m, ContextHandler ctx) 
+     => [FilePath]
+     -> Int 
+     -> Int
+     -> ContextT ctx os m (Texture2DArray os (Format RGBAFloat))
+importTextureArray filePaths height width = do
+        let layers = length filePaths
+            size = V3 height width layers
+        rawTextures <- liftIO $ fmap concat . traverse getTextureRaw $ filePaths
+        textureArray <- newTexture2DArray RGBA8 size 1
+        writeTexture2DArray textureArray 0 0 size rawTextures
+        pure textureArray
 
 importTexture :: (MonadIO m, ContextHandler ctx) 
      => FilePath
