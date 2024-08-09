@@ -6,6 +6,9 @@ displayHeight :: Int
 displayWidth = 1280
 displayHeight = 960
 
+logicUpdateTime :: Double
+logicUpdateTime = (1/60)
+
 zoomMinBound :: Float
 zoomMinBound = 1.2
 

@@ -13,7 +13,7 @@ import                         GUI.GUIElements      (provinceWindowPreElement)
 
 instance StateEvent MapState MapEvent where
     applyEvent mapEvent mapState = case mapEvent of
-            MoveCamera newPosition -> (mapState {position = newPosition}, [])
+            MoveCamera displacement -> (mapState {position = boundZoom (position mapState + displacement)}, [])
             UpdateMapCursor newCursor -> (mapState {cursor = newCursor}, [])
             UpdateMapMode newMapMode -> (mapState {mapMode = newMapMode}, [])
             ClickAtMap click -> case click of
@@ -28,3 +28,7 @@ instance StateEvent MapState MapEvent where
                 MapRightClick _ -> (mapState, [])
             UnselectProvince -> (mapState {selectedProv = Nothing}, [])
             _  -> (mapState, [])
+
+boundZoom :: V3 Float -> V3 Float
+boundZoom (V3 x y s) = V3 x y s'
+    where s' = max s zoomMinBound

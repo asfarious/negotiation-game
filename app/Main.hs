@@ -56,12 +56,17 @@ main =
                               , selectedProv = Nothing
                               }
         (guiState, _) = applyEvent (CreateElement cursorStatusPreElement) (blankGUIState :: GUIState Event) 
-                              
+    
+    maybeTime <- liftIO GLFW.getTime
+    let startingTime = case maybeTime of
+                        Just time -> time
+                        Nothing   -> 0
+    
     gameLoop renderBoard preRenderBoard
              renderGUI preRenderGUI
              win
              mapState guiState []
-             inputTVars 
+             inputTVars startingTime 0
              defaultFont' defaultChar
              cleanupCallback
 
@@ -70,16 +75,25 @@ gameLoop renderBoard preRenderBoard
          renderGUI preRenderGUI
          win
          mapState (guiState :: GUIState Event) pendingEvents
-         inputTVars 
+         inputTVars previousTime previousExcessTime
          defaultFont defaultChar
          cleanupCallback = do
     -- Collect input --
+    maybeCurrentTime <- liftIO GLFW.getTime
     input <- collectInput win inputTVars (flip isInsideGUI $ guiState)
+    let currentEvents = processEvents mapState $ input
     
     -- Process events arising from input --
-    let (guiEvents, mapEvents) = splitEvents . (pendingEvents ++) . processEvents mapState $ input
-    let (guiState', pendingGUIEvents) = update guiState guiEvents
-    let (mapState', pendingMapEvents) = update mapState mapEvents
+    let currentTime = case maybeCurrentTime of
+                                Just x  -> x
+                                Nothing -> previousTime
+        accumulatedTime = previousExcessTime + (currentTime - previousTime)
+        (excessTime, pendingEvents', guiState', mapState') = if accumulatedTime > logicUpdateTime
+            then let (guiEvents, mapEvents) = splitEvents . (pendingEvents ++) $ currentEvents
+                     (guiStateUpdated, pendingGUIEvents) = update guiState guiEvents
+                     (mapStateUpdated, pendingMapEvents) = update mapState mapEvents
+                 in (accumulatedTime - logicUpdateTime, pendingGUIEvents ++ pendingMapEvents, guiStateUpdated, mapStateUpdated)
+            else (accumulatedTime, currentEvents ++ pendingEvents, guiState, mapState)
     
     let cursorPointer = fmap normalizePoint $ cursor mapState'
     
@@ -91,7 +105,9 @@ gameLoop renderBoard preRenderBoard
         clearWindowColor win (V4 1 1 1 1)
         renderBoard
         renderGUI textLength boxNumber
-  
+    
+    --liftIO . putStrLn . show $ (currentTime - previousTime) * 1000 -- for debug purposes
+    
     swapWindowBuffers win
     
     -- Do another iteration --
@@ -104,8 +120,8 @@ gameLoop renderBoard preRenderBoard
         gameLoop renderBoard preRenderBoard
                  renderGUI preRenderGUI
                  win
-                 mapState' guiState' (pendingMapEvents ++ pendingGUIEvents)
-                 inputTVars 
+                 mapState' guiState' pendingEvents'
+                 inputTVars currentTime excessTime
                  defaultFont defaultChar
                  cleanupCallback
                  

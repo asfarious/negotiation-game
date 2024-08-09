@@ -24,13 +24,13 @@ processEvents mapState input = execWriter $ do
                                                                                    tell $ foldr processPressedKeys [] pressedKeys
                                                                                    pure $ foldr processHeldKeys (V3 0 0 0) heldKeys
                                                 Left textInput  -> pure $ V3 0 0 0
-        let dPos = keyboardMovement + V3 0 0 (negate . realToFrac $ (scrollInput input * mouseScrollSensitivity * zoomSpeed))
-            pos'@(V3 x z zoom) = boundZoom (position mapState + normDPos dPos)
+        let dPos = normDPos $ keyboardMovement + V3 0 0 (negate . realToFrac $ (scrollInput input * mouseScrollSensitivity * zoomSpeed))
         
-        if pos' /= V3 0 0 0
-            then tellP $ Event'MapEvent $ MoveCamera pos'
+        if dPos /= V3 0 0 0
+            then tellP $ Event'MapEvent $ MoveCamera dPos
             else pure ()
         
+        let (V3 x z zoom) = position mapState
         
         cursor <- case cursorPosition input of
                     Right cursorOnMap -> do
@@ -56,11 +56,6 @@ processHeldKeys GLFW.Key'PadAdd      v = v + V3 0 0 (negate . realToFrac $ (zoom
 processHeldKeys GLFW.Key'PadSubtract v = v + V3 0 0 (realToFrac $ (zoomSpeed * keyScrollSensitivity))
 processHeldKeys _ diff = diff
           
-          
-            
-boundZoom :: V3 Float -> V3 Float
-boundZoom (V3 x y s) = V3 x y s'
-    where s' = max s zoomMinBound
 
 normDPos :: V3 Float -> V3 Float
 normDPos dPos@(V3 0 0 s) = dPos
