@@ -27,7 +27,7 @@ main =
     win <- newWindow (WindowFormatColor RGBA8) 
         (GLFW.WindowConfig displayWidth displayHeight "The Negotiation Game" Nothing [GLFW.WindowHint'Resizable False] Nothing)
     
-    mapTextureArray <- importTextureArray [mapPath, provinceMapPath] mapHeight mapWidth
+    mapTextureArray <- importTextureArray [mapPath, provinceMapPath] mapWidth mapHeight
     
     freetype <- liftIO $ textInit
     defaultFont <- loadFont freetype defaultFontFile (V2 mapWidth mapHeight) 
@@ -47,6 +47,7 @@ main =
     let initialPosition = V3 (mapQuadWidth/2) (mapQuadHeight/2) initialZoom
     (preRenderBoard, renderBoard) <- initBoardRenderer initialPosition win mapTextureArray
     (preRenderGUI, renderGUI) <- initGUIRenderer win atlas
+    
     
     provinceMap <- liftIO $ getImage provinceMapPath
     let mapState = MkMapState { position     = initialPosition

@@ -37,10 +37,10 @@ mapHeight :: Num a => a
 mapHeight = 1024
 
 mapWidth :: Num a => a
-mapWidth = 1024
+mapWidth = 2048
 
 mapQuadWidth :: Float
-mapQuadWidth = 10.0
+mapQuadWidth = 20.0
 
 mapQuadHeight :: Float
 mapQuadHeight = 10.0
