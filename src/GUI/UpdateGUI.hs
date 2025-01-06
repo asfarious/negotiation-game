@@ -34,6 +34,11 @@ instance StateEvent (GUIState Event) (GUIEvent Event) where
                                                                     }
                                                          , []
                                                          )
+            SetDragged newDragged -> (guiState {draggedElement = newDragged}, [])
+            Drag displacement -> case draggedElement guiState of
+                Just elementID -> (guiState {guiElements = adjustToTop (move displacement)elementID elements}, [])
+                Nothing        -> (guiState, [])
+            _ -> (guiState, [])
 
 createElement :: PreGUIElement Event -> GUIState Event -> GUIState Event
 createElement (bBox, eventHandler, renderHandler) guiState 

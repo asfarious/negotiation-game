@@ -40,6 +40,9 @@ processEvents mapState input = execWriter $ do
                     Left  cursorOnGUI -> do
                                             processMouseOnGUI cursorOnGUI $ mouseButtonInput input
                                             pure Nothing
+        case toDrag input of
+            Nothing -> tellP . Event'GUIEvent . SetDragged $ Nothing
+            Just amount -> tellP. Event'GUIEvent . Drag $ amount
         
         tellP $ Event'MapEvent $ UpdateMapCursor cursor
 

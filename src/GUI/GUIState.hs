@@ -10,11 +10,13 @@ blankGUIState :: GUIState event
 blankGUIState = MkGUIState { nextID            = 0
                            , guiElements       = IM.empty
                            , misensceneElement = Nothing
+                           , draggedElement    = Nothing
                            }
 
 data GUIState event = MkGUIState { nextID            :: Int
                                  , guiElements       :: InsOrdHashMap Int (GUIElement event)
                                  , misensceneElement :: Maybe Int
+                                 , draggedElement    :: Maybe Int
                                  }
 
 newtype GUIElement event = MkGUIElement (Int, BoundingBox, GUIEventHandler event, GUIRenderHandler)
@@ -37,6 +39,8 @@ data GUIEvent event = CreateElement (PreGUIElement event)
                     | MoveElement Int (V2 Int)
                     | ClickAtGUI GUIClick
                     | UpdateMisensceneElement (PreGUIElement event)
+                    | SetDragged (Maybe Int)
+                    | Drag (V2 Int)
 
 data GUIClick = GUILeftClick (V2 Int)
               | GUIRightClick (V2 Int)

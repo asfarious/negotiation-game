@@ -28,8 +28,19 @@ collectInput win inputTVars cursorCondition = do
         resolvedCursor = resolveCursor cursorInput cursorCondition
     
     (pressedKeys, heldKeys, _) <- pollWith isKeyPressed win (keyButtonsTVar inputTVars) allKeys   
-    (mouseInput, _, _)  <- pollWith isMBPressed win (mouseButtonsTVar inputTVars) allPossible
-           
+    (mouseInput, heldMouse, mouseReleased)  <- pollWith isMBPressed win (mouseButtonsTVar inputTVars) allPossible
+    
+    toDrag' <- if GLFW.MouseButton'1 `elem` heldMouse then
+        liftIO $ atomically $ do
+            maybeDrag <- readTVar $ maybeDragTVar inputTVars
+            let roundedCur = fmap round cursorInput
+            writeTVar (maybeDragTVar inputTVars) $ Just roundedCur
+            case maybeDrag of
+                Just prev -> pure $ Just $ roundedCur - prev
+                _         -> pure $ Just $ V2 0 0
+        else liftIO $ atomically $ writeTVar (maybeDragTVar inputTVars) Nothing >> pure Nothing
+            
+    
     toScroll <- liftIO $ atomically $ do
         scrolled <- readTVar $ scrollTVar inputTVars
         writeTVar (scrollTVar inputTVars) (0 :: Double)
@@ -39,6 +50,7 @@ collectInput win inputTVars cursorCondition = do
                    , mouseButtonInput = mouseInput
                    , scrollInput = toScroll
                    , cursorPosition = resolvedCursor
+                   , toDrag = toDrag'
                    }
 
 justPressed :: (Ord a) => [a] -> [a] -> TVar (Map a Int) -> STM [a]
@@ -107,13 +119,15 @@ initInputTVars = do
                     strTVar'          :: TVar String                     <- newTVar ([] :: String)
                     scrollTVar'       :: TVar Double                     <- newTVar (0 :: Double)
                     mouseButtonsTVar' :: TVar (Map GLFW.MouseButton Int) <- newTVar $ M.fromList . zip allPossible $ repeat 0
-                    keyButtonsTVar'    :: TVar (Map GLFW.Key Int)         <- newTVar $ M.fromList . zip allKeys $ repeat 0
+                    keyButtonsTVar'   :: TVar (Map GLFW.Key Int)         <- newTVar $ M.fromList . zip allKeys $ repeat 0
+                    maybeDragTVar'    :: TVar (Maybe (V2 Int))           <- newTVar (Nothing :: Maybe (V2 Int))
                     
                     pure MkInputTVars { scrollTVar       = scrollTVar'
                                       , strTVar          = strTVar'
                                       , isStrTVar        = isStrTVar'
                                       , mouseButtonsTVar = mouseButtonsTVar'
                                       , keyButtonsTVar   = keyButtonsTVar'
+                                      , maybeDragTVar    = maybeDragTVar'
                                       }
         
 data InputTVars = MkInputTVars { scrollTVar       :: TVar Double
@@ -121,10 +135,12 @@ data InputTVars = MkInputTVars { scrollTVar       :: TVar Double
                                , isStrTVar        :: TVar Bool
                                , mouseButtonsTVar :: TVar (Map GLFW.MouseButton Int)
                                , keyButtonsTVar   :: TVar (Map GLFW.Key Int)
+                               , maybeDragTVar    :: TVar (Maybe (V2 Int))
                                }
                                
 data Input = MkInput { keyboardInput    :: Either String ([GLFW.Key], [GLFW.Key])
                      , mouseButtonInput :: [GLFW.MouseButton]
                      , scrollInput      :: Double
                      , cursorPosition   :: Either (V2 Int) (V2 Float)
+                     , toDrag           :: Maybe (V2 Int)
                      }

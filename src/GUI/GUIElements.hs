@@ -35,3 +35,4 @@ provinceWindowPreElement (V4 r g b a) = flip newPreElement (V4 825 40 400 450) $
                                                                 coloredButton (V4 280 0 120 40) (V4 0 0 1 1) $ \self _ -> [ Event'GUIEvent $ DeleteElement self
                                                                                                                           , Event'MapEvent $ UnselectProvince
                                                                                                                           ]
+                                                                coloredButton (V4 0 0 280 40) (V4 0 1 0 1) $ \self _ -> [Event'GUIEvent $ SetDragged $ Just self]
