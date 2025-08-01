@@ -47,3 +47,6 @@ mapQuadHeight = 10.0
 
 defaultFontFile :: FilePath
 defaultFontFile = "data/font/NotoSans-Regular.ttf"
+
+guiLimit :: Int
+guiLimit = 800

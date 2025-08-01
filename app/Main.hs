@@ -24,7 +24,7 @@ import                         GUI.GUIElements
 main :: IO ()
 main =
   runContextT GLFW.defaultHandleConfig $ do
-    win <- newWindow (WindowFormatColor RGBA8) 
+    win <- newWindow (WindowFormatColorDepth RGBA8 Depth32) 
         (GLFW.WindowConfig displayWidth displayHeight "The Negotiation Game" Nothing [GLFW.WindowHint'Resizable False] Nothing)
     
     mapTextureArray <- importTextureArray [mapPath, provinceMapPath] mapWidth mapHeight
@@ -104,6 +104,7 @@ gameLoop renderBoard preRenderBoard
     -- Render the state --
     render $ do
         clearWindowColor win (V4 1 1 1 1)
+        clearWindowDepth win (-1)
         renderBoard
         renderGUI textLength boxNumber
     

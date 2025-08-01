@@ -46,7 +46,7 @@ boardShader win positionBuffer selectedProvBuffer mapTextureArray = do
     drawWindowColor (const (win, ContextColorOption blending (V4 True True True True))) fragmentStreamHighlight
     drawWindowColor (const (win, ContextColorOption NoBlending (V4 True True True True))) fragmentStreamPoints
 
-textShader :: Window os RGBAFloat ds
+textShader :: Window os RGBAFloat Depth
            -> Texture2D os (Format RFloat)
            -- -> V3 Float -- TODO: add the text color as a parameter of some sort
            -> Shader os (PrimitiveArray Triangles (B3 Float, B4 Float, B2 Float, B4 Float)) ()
@@ -65,18 +65,27 @@ textShader win atlasTex = do -- (V3 rColor gColor bColor) = do
         bitmapToColor = \alpha -> V4 0 0 0 alpha
         fragmentStreamTextured = fmap (bitmapToColor . sampleAtlas) fragmentStream
     
+    let fragmentStreamDepthed = withRasterizedInfo (\color rasterizedInfo 
+            -> let (V4 _ _ z _) = rasterizedFragCoord rasterizedInfo
+            in  (color, z)
+            ) fragmentStreamTextured
+    
     let blending = BlendRgbAlpha (FuncAdd, FuncAdd) (BlendingFactors SrcAlpha OneMinusSrcAlpha, BlendingFactors One Zero) (V4 0 0 0 0)
-    drawWindowColor (const (win, ContextColorOption blending (V4 True True True True))) fragmentStreamTextured
+    drawWindowColorDepth (const (win, ContextColorOption blending (V4 True True True True), DepthOption Gequal True)) fragmentStreamDepthed
 
 
-boxShader :: Window os RGBAFloat ds
-          -> Shader os (PrimitiveArray Triangles (B4 Float, B4 Float, B4 Float)) ()
+boxShader :: Window os RGBAFloat Depth
+          -> Shader os (PrimitiveArray Triangles (B4 Float, B4 Float, B4 Float, B Float)) ()
 boxShader win = do
     primitiveStream <- toPrimitiveStream id
     let primitiveStream2 
-            = fmap (\(V4 vertX vertY vertZ vertW, V4 x y width height, color) -> (V4 (x + vertX*width) (y + (negate vertY * height)) vertZ vertW, color)) primitiveStream
+            = fmap (\(V4 vertX vertY vertZ vertW, V4 x y width height, color, z) -> (V4 (x + vertX*width) (y + (negate vertY * height)) (z + vertZ) vertW, color)) primitiveStream
     
     fragmentStream <- rasterize (const (FrontAndBack, PolygonFill, ViewPort (V2 0 0) (V2 displayWidth displayHeight), DepthRange 0 1)) primitiveStream2
+    let fragmentStreamDepthed = withRasterizedInfo (\color rasterizedInfo 
+            -> let (V4 _ _ z _) = rasterizedFragCoord rasterizedInfo
+            in  (color, z)
+            ) fragmentStream
     
     let blending = BlendRgbAlpha (FuncAdd, FuncAdd) (BlendingFactors SrcAlpha OneMinusSrcAlpha, BlendingFactors One Zero) (V4 0 0 0 0)
-    drawWindowColor (const (win, ContextColorOption NoBlending (V4 True True True True))) fragmentStream
+    drawWindowColorDepth (const (win, ContextColorOption NoBlending (V4 True True True True), DepthOption Gequal True)) fragmentStreamDepthed
